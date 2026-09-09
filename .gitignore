@@ -1,0 +1,28 @@
+# Build output
+dist/
+build/
+
+# Dependencies
+node_modules/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Certificates / signing
+*.p12
+*.pfx
+cert.p12
+cert.pfx
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+
+# Tooling
+.agents/
+skills-lock.json
+consolelogs.txt

@@ -1,0 +1,14 @@
+{
+  "name": "amverge-extension-root",
+  "version": "1.0.0",
+  "description": "Root shortcuts for AMVerge AE Extension tools",
+  "private": true,
+  "scripts": {
+    "build": "npm run build --prefix tools",
+    "build:2018": "npm run build:2018 --prefix tools",
+    "build:2020": "npm run build:2020 --prefix tools",
+    "build:2022": "npm run build:2022 --prefix tools",
+    "build:all": "npm run build:all --prefix tools",
+    "docs": "npm run docs --prefix tools"
+  }
+}

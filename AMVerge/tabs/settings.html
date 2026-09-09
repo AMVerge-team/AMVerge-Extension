@@ -1,0 +1,148 @@
+<div id="page-settings" class="page">
+  <div class="settings-page">
+    <h2 class="settings-heading"><svg class="icon"><use href="#icon-settings"/></svg> Settings</h2>
+    <div class="settings-group">
+      <div class="settings-row">
+        <span class="settings-label">Python Path</span>
+        <div class="settings-control">
+          <input type="text" class="settings-text-input" id="settingsPythonPath" placeholder="Auto-detect" onchange="App.saveSettings()">
+          <button class="button button-small" onclick="App.browsePython()"><svg class="icon"><use href="#icon-folder"/></svg></button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <span class="settings-label">Output Directory</span>
+        <div class="settings-control">
+          <input type="text" class="settings-text-input" id="settingsOutputDir" placeholder="~/Downloads/AMVerge" onchange="App.saveSettings()">
+          <button class="button button-small" onclick="App.browseOutputDir()"><svg class="icon"><use href="#icon-folder"/></svg></button>
+        </div>
+      </div>
+      <div class="settings-row">
+        <span class="settings-label">Scene Detection</span>
+        <div class="settings-control">
+          <select class="settings-select" id="settingsDetectionMethod" onchange="App.saveSettings()">
+            <option value="transnetv2_gpu">AI Scene Detection (TransNetV2)</option>
+            <option value="keyframe_detection">Keyframe Detection (Fast)</option>
+          </select>
+        </div>
+      </div>
+      <div class="settings-row">
+        <span class="settings-label">Layer Name Prefix</span>
+        <div class="settings-control">
+          <input type="text" class="settings-text-input" id="settingsLayerPrefix" placeholder="AMVerge_" onchange="App.saveSettings()">
+        </div>
+      </div>
+      <div class="settings-row">
+        <span class="settings-label">Auto-Scale to Comp</span>
+        <div class="settings-control">
+          <label class="custom-checkbox">
+            <input type="checkbox" id="settingsAutoScale" checked onchange="App.saveSettings()">
+            <span class="checkmark"></span>
+          </label>
+        </div>
+      </div>
+      <div class="settings-row">
+        <span class="settings-label">Accent & Theme</span>
+        <div class="settings-control">
+          <div class="color-picker-container" id="colorPickerContainer">
+            <div class="color-preview-box" id="colorPreviewBox" style="background:#22c55e" onclick="App.toggleColorPicker()"></div>
+            <div class="color-picker-popover" id="colorPickerPopover" style="display:none">
+              <div class="color-presets-grid" id="colorPresetsGrid"></div>
+              <div class="color-picker-manual">
+                <span class="hex-prefix">#</span>
+                <input type="text" class="hex-input" id="hexInput" maxlength="6">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="settings-row">
+        <span class="settings-label">Sync with AMVerge App</span>
+        <div class="settings-control" style="display:flex;align-items:center;gap:8px">
+          <label class="custom-checkbox">
+            <input type="checkbox" id="settingsSyncTheme" onchange="App.saveSettings()">
+            <span class="checkmark"></span>
+          </label>
+          <button class="button button-small" onclick="App.syncThemeFromApp(true)" title="Read theme from desktop app storage">
+            <svg class="icon"><use href="#icon-sync"/></svg> Sync Now
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <h3 class="settings-subheading"><svg class="icon"><use href="#icon-video"/></svg> Appearance & Background</h3>
+      
+      <div class="settings-row">
+        <span class="settings-label">Background Media</span>
+        <div class="settings-control" style="display:flex;gap:6px">
+          <button class="button button-small" onclick="App.pickBackgroundMedia()">
+            <svg class="icon"><use href="#icon-folder"/></svg> <span id="bgMediaBtnLabel">Upload</span>
+          </button>
+          <button class="button button-small button-danger" id="clearBgMediaBtn" onclick="App.clearBackgroundMedia()" style="display:none">
+            <svg class="icon"><use href="#icon-trash"/></svg> Clear
+          </button>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <span class="settings-label">Background Opacity</span>
+        <div class="settings-control" style="display:flex;align-items:center;gap:8px">
+          <input type="range" class="settings-range" id="settingsBgOpacity" min="0" max="1" step="0.05" value="1" oninput="App.onBgOpacityChange(this.value)">
+          <span class="settings-value" id="bgOpacityValue" style="width:36px;text-align:right">100%</span>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <span class="settings-label">Background Blur</span>
+        <div class="settings-control" style="display:flex;align-items:center;gap:8px">
+          <input type="range" class="settings-range" id="settingsBgBlur" min="0" max="60" step="2" value="0" oninput="App.onBgBlurChange(this.value)">
+          <span class="settings-value" id="bgBlurValue" style="width:36px;text-align:right">0px</span>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <span class="settings-label">Grid Preview Speed</span>
+        <div class="settings-control" style="display:flex;align-items:center;gap:8px">
+          <input type="range" class="settings-range" id="settingsPreviewSpeed" min="0.5" max="2.5" step="0.1" value="1" oninput="App.onPreviewSpeedChange(this.value)">
+          <span class="settings-value" id="previewSpeedValue" style="width:36px;text-align:right">1.0x</span>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <span class="settings-label">Show Clip Timestamps</span>
+        <div class="settings-control">
+          <label class="custom-checkbox">
+            <input type="checkbox" id="settingsShowTimestamps" checked onchange="App.saveSettings()">
+            <span class="checkmark"></span>
+          </label>
+        </div>
+      </div>
+
+      <div style="margin-top:6px">
+        <button class="button button-danger" onclick="App.resetThemeToDefaults()">
+          <svg class="icon"><use href="#icon-trash"/></svg> Reset Appearance Defaults
+        </button>
+      </div>
+    </div>
+
+    <div class="settings-group">
+      <h3 class="settings-subheading"><svg class="icon"><use href="#icon-cpu"/></svg> System</h3>
+      <div class="settings-row">
+        <span class="settings-label">Python</span>
+        <span class="settings-value" id="sysPythonStatus">Checking...</span>
+      </div>
+      <div class="settings-row">
+        <span class="settings-label">amverge</span>
+        <span class="settings-value" id="sysAmvergeStatus">Checking...</span>
+      </div>
+      <div class="settings-row">
+        <span class="settings-label">GPU</span>
+        <span class="settings-value" id="sysGpuStatus">Checking...</span>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+        <button class="button" onclick="App.runDoctor()"><svg class="icon"><use href="#icon-tools"/></svg> Run Diagnostics</button>
+        <button class="button button-danger" onclick="App.confirmFactoryReset()"><svg class="icon"><use href="#icon-trash"/></svg> Reset to Setup</button>
+      </div>
+    </div>
+  </div>
+</div>

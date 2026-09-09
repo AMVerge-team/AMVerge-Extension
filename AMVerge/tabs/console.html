@@ -1,0 +1,26 @@
+<div id="page-console" class="page">
+  <div class="console-panel">
+    <div class="console-toolbar">
+      <div class="console-header-left">
+        <span class="pane-title"><svg class="icon"><use href="#icon-console"/></svg> Console</span>
+        <span class="console-count-badge" id="consoleCountBadge">0</span>
+      </div>
+      <div class="console-filters">
+        <button class="console-filter-btn active" data-level="all" onclick="ConsolePanel.setFilterLevel('all')">All</button>
+        <button class="console-filter-btn" data-level="error" onclick="ConsolePanel.setFilterLevel('error')">Error</button>
+        <button class="console-filter-btn" data-level="warn" onclick="ConsolePanel.setFilterLevel('warn')">Warn</button>
+        <button class="console-filter-btn" data-level="info" onclick="ConsolePanel.setFilterLevel('info')">Info</button>
+        <button class="console-filter-btn" data-level="debug" onclick="ConsolePanel.setFilterLevel('debug')">Debug</button>
+      </div>
+      <div class="console-search-wrap">
+        <svg class="icon console-search-icon"><use href="#icon-search"/></svg>
+        <input id="consoleSearch" type="text" placeholder="Filter output...">
+      </div>
+      <div class="console-actions">
+        <button class="button button-small" id="consoleCopyBtn" title="Copy visible logs"><svg class="icon"><use href="#icon-copy"/></svg> Copy</button>
+        <button class="button button-small button-danger" id="consoleClearBtn" title="Clear console"><svg class="icon"><use href="#icon-trash"/></svg> Clear</button>
+      </div>
+    </div>
+    <div class="console-entries" id="consoleEntries"></div>
+  </div>
+</div>

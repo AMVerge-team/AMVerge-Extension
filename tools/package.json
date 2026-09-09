@@ -1,0 +1,19 @@
+{
+  "name": "amverge-extension-tools",
+  "version": "1.0.0",
+  "description": "Build tooling for AMVerge AE Extension",
+  "private": true,
+  "scripts": {
+    "build": "node build.js --target=2020",
+    "build:2018": "node build.js --target=2018",
+    "build:2020": "node build.js --target=2020",
+    "build:2022": "node build.js --target=2022",
+    "build:all": "node build.js --target=2018 && node build.js --target=2020 && node build.js --target=2022 && node generate-docs.js",
+    "docs": "node generate-docs.js"
+  },
+  "devDependencies": {
+    "javascript-obfuscator": "^5.4.3",
+    "jsxbin": "^2.3.0",
+    "zxp-sign-cmd": "^2.0.0"
+  }
+}

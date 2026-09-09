@@ -1,0 +1,52 @@
+<div id="setup-gate" class="setup-overlay" style="display:none">
+  <div class="setup-modal">
+    <div class="setup-header">
+      <img src="LogoAMVergeFull.png" alt="AMVerge" class="setup-logo">
+      <p class="setup-subtitle">Scene Detection for After Effects</p>
+    </div>
+    <div class="setup-body" id="setupBody">
+      <div id="setupWelcome" class="setup-step">
+        <h2>Welcome</h2>
+        <p>AMVerge detects scene cuts in videos and imports them directly into your After Effects timeline.</p>
+        <p>Choose how you would like to run AMVerge in After Effects:</p>
+        <div class="setup-mode-cards">
+          <div class="setup-mode-card active" id="modeCardSync" onclick="ToolsSetup.selectMode('sync')">
+            <div class="mode-card-header">
+              <svg class="icon"><use href="#icon-sync"/></svg>
+              <span class="mode-card-title">Sync with AMVerge App</span>
+              <span class="badge badge-accent">Recommended</span>
+            </div>
+            <p class="mode-card-desc">Automatically shares detected episodes, scene manifests, and custom theme presets with your standalone AMVerge Desktop App.</p>
+          </div>
+          <div class="setup-mode-card" id="modeCardStandalone" onclick="ToolsSetup.selectMode('standalone')">
+            <div class="mode-card-header">
+              <svg class="icon"><use href="#icon-cpu"/></svg>
+              <span class="mode-card-title">Standalone Extension</span>
+            </div>
+            <p class="mode-card-desc">Runs entirely inside After Effects independently, using the local amverge Python CLI for scene detection.</p>
+          </div>
+        </div>
+        <button class="button button-accent button-large" onclick="App._setupNext()" style="margin-top:10px">Continue</button>
+      </div>
+      <div id="setupCheck" class="setup-step" style="display:none">
+        <h2>Checking System...</h2>
+        <div id="setupCheckResults"></div>
+        <div style="margin-top:8px;display:flex;gap:4px">
+          <button class="button" onclick="App._setupSkip()">Skip</button>
+          <button class="button button-accent" id="setupInstallBtn" onclick="App._setupInstall()" disabled>Install</button>
+          <button class="button button-accent" id="setupContinueBtn" onclick="App._setupFinish()" disabled>Continue</button>
+        </div>
+      </div>
+      <div id="setupInstall" class="setup-step" style="display:none">
+        <h2>Installing Backend</h2>
+        <div class="progress-bar"><div class="progress-fill" id="setupProgressFill" style="width:0%"></div></div>
+        <p id="setupStatusText">Installing amverge package...</p>
+      </div>
+      <div id="setupComplete" class="setup-step" style="display:none">
+        <h2><svg class="icon" style="color:var(--accent)"><use href="#icon-check"/></svg> Ready</h2>
+        <p id="setupCompleteText">Backend setup complete. You can now detect scenes.</p>
+        <button class="button button-accent button-large" onclick="App._setupFinish()">Launch AMVerge</button>
+      </div>
+    </div>
+  </div>
+</div>

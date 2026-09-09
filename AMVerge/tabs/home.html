@@ -1,0 +1,129 @@
+<div id="page-home" class="page active">
+  <div id="importArea" class="import-area">
+    <div id="importIdle" class="import-idle">
+      <img src="LogoAMVergeFull.png" alt="AMVerge" class="idle-logo">
+      
+      <div id="aeLayerActionWrap" class="ae-layer-action-wrap" style="display:none">
+        <button class="button button-accent button-large button-full" id="detectActiveLayerBtn" onclick="App.startImportFromActiveLayer()">
+          <svg class="icon"><use href="#icon-layers"/></svg> Detect Selected Layer (<span id="aeLayerBtnName">Footage</span>)
+        </button>
+        <div id="aeLayerInfo" class="ae-layer-info">
+          <svg class="icon"><use href="#icon-video"/></svg>
+          <span id="aeLayerInfoText"></span>
+        </div>
+      </div>
+
+      <div class="import-buttons">
+        <button class="button button-accent button-large" onclick="App.startImport()">
+          <svg class="icon"><use href="#icon-folder"/></svg> Browse File
+        </button>
+        <button class="button button-large" onclick="App.startImportFromProject()">
+          <svg class="icon"><use href="#icon-video"/></svg> Project Bin
+        </button>
+      </div>
+      <div class="import-divider">
+        <span>or drop video file</span>
+      </div>
+      <p class="import-hint">MP4, MKV, MOV supported</p>
+    </div>
+    <div id="importProgress" class="import-progress" style="display:none">
+      <div class="import-status-row">
+        <span class="import-label">Detecting scenes...</span>
+        <span class="import-pct" id="importPct">0%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="importProgressFill" style="width:0%"></div></div>
+      
+      <div class="import-time-row">
+        <div class="import-time-stat">
+          <span class="import-time-label">Elapsed</span>
+          <span class="import-time-val" id="importElapsedVal">00:00</span>
+        </div>
+        <div class="import-time-stat">
+          <span class="import-time-label">ETA</span>
+          <span class="import-time-val" id="importEtaVal">--:--</span>
+        </div>
+      </div>
+
+      <div class="import-status-text" id="importStatusText">Initializing...</div>
+      <div class="import-cancel-row">
+        <button class="button button-danger" onclick="App.cancelDetection()">
+          <svg class="icon"><use href="#icon-x"/></svg> Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="scenePanel" class="scene-panel" style="display:none">
+    <div class="split-layout" id="splitLayout">
+      <div class="left-pane">
+        <div class="pane-header">
+          <div class="pane-header-left">
+            <span class="pane-title">Scenes</span>
+            <span class="scene-count" id="sceneCount">0</span>
+          </div>
+          <div class="pane-header-actions">
+            <div class="density-toggles">
+              <button class="density-btn" data-density="compact" onclick="ClipsPanel.setDensity('compact')" title="Compact View">S</button>
+              <button class="density-btn active" data-density="normal" onclick="ClipsPanel.setDensity('normal')" title="Standard View">M</button>
+              <button class="density-btn" data-density="large" onclick="ClipsPanel.setDensity('large')" title="Large View">L</button>
+            </div>
+            <div class="selection-pill-group">
+              <button class="pill-action-btn" onclick="ClipsPanel.selectAll()">All</button>
+              <button class="pill-action-btn" onclick="ClipsPanel.deselectAll()">None</button>
+            </div>
+            <button class="pane-action-btn" id="togglePreviewDrawerBtn" onclick="App.togglePreviewPane()" title="Toggle Preview Panel">
+              <svg class="icon"><use href="#icon-video"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="clips-container" id="clipsContainer">
+          <div class="clips-grid" id="clipsGrid"></div>
+        </div>
+      </div>
+      <div class="divider" id="mainDivider"></div>
+      <div class="right-pane" id="rightPane">
+        <div class="pane-header">
+          <span class="pane-title">Preview</span>
+          <div class="preview-nav">
+            <button class="preview-nav-btn" id="previewPrevBtn" onclick="PreviewPanel.navigatePrev()" disabled>
+              <svg class="icon"><use href="#icon-chevron-left"/></svg>
+            </button>
+            <span class="preview-nav-label" id="previewNavLabel">-</span>
+            <button class="preview-nav-btn" id="previewNextBtn" onclick="PreviewPanel.navigateNext()" disabled>
+              <svg class="icon"><use href="#icon-chevron-right"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="preview-container" id="previewContainer">
+          <div class="preview-window" id="previewWindow">
+            <div class="preview-empty" id="previewEmpty">
+              <svg class="icon"><use href="#icon-video"/></svg>
+              <p>Select a scene</p>
+            </div>
+            <video class="preview-video" id="previewVideo" style="display:none" controls></video>
+          </div>
+          <div class="scene-info" id="sceneInfo" style="display:none">
+            <div class="scene-info-row">
+              <span class="scene-info-label">Scene</span>
+              <span class="scene-info-value" id="sceneInfoIndex">#0</span>
+            </div>
+            <div class="scene-info-row">
+              <span class="scene-info-label">Duration</span>
+              <span class="scene-info-value" id="sceneInfoDuration">0:00</span>
+            </div>
+            <div class="scene-info-row">
+              <span class="scene-info-label">Time</span>
+              <span class="scene-info-value" id="sceneInfoTime">0:00 - 0:00</span>
+            </div>
+          </div>
+          <div class="import-actions">
+            <button class="button button-accent button-full" id="importToAeBtn" onclick="App.importSelectedToAE()" disabled>
+              <svg class="icon"><use href="#icon-import"/></svg> Import Selected to AE
+            </button>
+            <div class="selected-info" id="selectedInfo">0 scenes selected</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
