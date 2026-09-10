@@ -2,6 +2,7 @@
   var ClipsPanel = {
     _scenes: [],
     _selected: {},
+    _focusedIdx: null,
     _lastClickedIdx: null,
     _listeners: [],
 
@@ -23,7 +24,11 @@
     loadScenes: function (scenes) {
       this._scenes = scenes;
       this._selected = {};
+      this._focusedIdx = null;
       this._lastClickedIdx = null;
+      // every route into an episode lands here, closing one included, so this
+      // is where the proxy cache follows what the grid is actually showing
+      if (window.PreviewProxy) window.PreviewProxy.reset(scenes, this.app);
       this.render();
       document.getElementById('sceneCount').textContent = scenes.length;
     },
@@ -59,11 +64,17 @@
         wrapper.dataset.index = idx;
 
         if (s.clip_path) wrapper.classList.add('cut-ready');
+        if (idx === this._focusedIdx) {
+          wrapper.classList.add('focused');
+        }
         if (this._selected[idx]) {
           wrapper.classList.add('selected');
         }
 
-        var thumb = s.thumbnail || s.path || '';
+        // only a real image. `s.path` is the clip's .mp4 for a reopened
+        // episode, and pointing an <img> at that fails to decode, hides itself
+        // via onerror, and leaves a black tile
+        var thumb = s.thumbnail || '';
         var img = document.createElement('img');
         img.className = 'clip-thumb';
         img.draggable = false;
@@ -76,7 +87,8 @@
           img.style.display = 'none';
         }
 
-        // Lazy hover video player
+        // Lazy hover video player. Silent on purpose: a grid of tiles that
+        // each start talking when the pointer crosses them is unusable.
         var clipPath = s.clip_path || s.path || '';
         var hoverVideo = null;
         if (clipPath) {
@@ -85,7 +97,22 @@
           hoverVideo.muted = true;
           hoverVideo.loop = true;
           hoverVideo.playsInline = true;
-          hoverVideo.preload = 'none';
+
+          if (thumb) {
+            // a still exists, so the clip is only decoded on hover
+            hoverVideo.preload = 'none';
+          } else {
+            // no still to show, so the video itself provides the poster: with
+            // metadata preloaded it paints its first frame and stands in for
+            // the thumbnail instead of leaving the tile black
+            hoverVideo.preload = 'metadata';
+            hoverVideo.style.display = 'block';
+            (function (v, p) {
+              window.PreviewProxy.request(p, function (playable) {
+                v.src = 'file:///' + encodeURI(playable.replace(/\\/g, '/'));
+              });
+            })(hoverVideo, clipPath);
+          }
         }
 
         var overlay = document.createElement('div');
@@ -102,57 +129,115 @@
         wrapper.appendChild(overlay);
         wrapper.appendChild(sel);
 
-        (function (w, idx, clipP, vidEl) {
+        (function (w, idx, clipP, vidEl, thumb, sel) {
           var hoverTimer = null;
+          var hovering = false;
+
+          var startPlaying = function (playable) {
+            // the pointer can leave while a proxy is still building, and a tile
+            // that starts playing after that looks like it picked itself
+            if (!hovering) return;
+            if (!vidEl.src) {
+              vidEl.src = 'file:///' + encodeURI(playable.replace(/\\/g, '/'));
+            }
+            vidEl.style.display = 'block';
+            var playPromise = vidEl.play();
+            if (playPromise && playPromise.catch) {
+              playPromise.catch(function () {});
+            }
+          };
+
           w.addEventListener('mouseenter', function () {
             if (!vidEl || !clipP) return;
+            hovering = true;
             hoverTimer = setTimeout(function () {
-              if (!vidEl.src) {
-                vidEl.src = 'file:///' + encodeURI(clipP.replace(/\\/g, '/'));
-              }
-              vidEl.style.display = 'block';
-              var playPromise = vidEl.play();
-              if (playPromise && playPromise.catch) {
-                playPromise.catch(function () {});
-              }
+              // an already-built proxy starts instantly. one that is not built
+              // yet leaves the still up until it is, rather than showing the
+              // black picture an undecodable clip would paint
+              var ready = window.PreviewProxy.cached(clipP);
+              if (ready || vidEl.src) startPlaying(ready || clipP);
+              else window.PreviewProxy.request(clipP, startPlaying);
             }, 120);
           });
 
           w.addEventListener('mouseleave', function () {
+            hovering = false;
             if (hoverTimer) {
               clearTimeout(hoverTimer);
               hoverTimer = null;
             }
             if (vidEl) {
               vidEl.pause();
-              vidEl.currentTime = 0;
-              vidEl.style.display = 'none';
+              // back to the first frame, which is what the tile shows at rest
+              try { vidEl.currentTime = 0; } catch (e) {}
+              // only hide it when there is a still underneath to fall back to.
+              // when the video is standing in for a missing thumbnail, hiding
+              // it would leave the tile black
+              if (thumb) vidEl.style.display = 'none';
             }
           });
 
+          // Same controls as the desktop app: click focuses, double click and
+          // ctrl-click toggle the export checkmark, shift-click takes a range.
+          // Focus and selection are separate ideas here, which is why a plain
+          // click never changes what is ticked.
           w.addEventListener('click', function (e) {
-            if (e.shiftKey && ClipsPanel._lastClickedIdx !== null) {
-              ClipsPanel._rangeSelect(ClipsPanel._lastClickedIdx, idx);
+            // the corner checkbox is a direct toggle wherever it is clicked
+            if (e.target === sel || sel.contains(e.target)) {
+              e.stopPropagation();
+              ClipsPanel.toggleSelect(idx);
               return;
             }
-            ClipsPanel._lastClickedIdx = idx;
 
-            if (e.target === sel || sel.contains(e.target)) {
-              ClipsPanel.toggleSelect(idx);
-            } else {
-              if (!e.shiftKey && !e.ctrlKey) {
-                ClipsPanel.selectScene(idx);
-              }
+            if (e.shiftKey) {
+              // anchored on the focused clip, matching the app. replaces the
+              // selection rather than adding to it, so a mis-aimed range is
+              // corrected by shift-clicking again instead of having to clear
+              ClipsPanel._rangeSelect(
+                ClipsPanel._focusedIdx !== null ? ClipsPanel._focusedIdx : idx,
+                idx
+              );
+              return;
             }
+
+            if (e.ctrlKey || e.metaKey) {
+              ClipsPanel.toggleSelect(idx);
+              return;
+            }
+
+            dbg('info', 'Clips', 'click focus idx=' + idx);
+            ClipsPanel.focusScene(idx);
           });
-        })(wrapper, idx, clipPath, hoverVideo);
+
+          // double click ticks it for export without disturbing focus
+          w.addEventListener('dblclick', function (e) {
+            e.preventDefault();
+            ClipsPanel.toggleSelect(idx);
+          });
+        })(wrapper, idx, clipPath, hoverVideo, thumb, sel);
 
         grid.appendChild(wrapper);
       }
     },
 
+    /** focus a clip: outline it and load it into the preview.
+     *
+     * Deliberately separate from selection. Focus is "what am I looking at",
+     * selection is "what gets exported", and the app treats them the same way.
+     */
+    focusScene: function (idx) {
+      this._focusedIdx = parseInt(idx, 10);
+      this._updateFocusUI();
+      if (!this.app) {
+        dbg('error', 'Clips', 'no app reference, cannot open preview');
+        return;
+      }
+      this.app.selectScene(this._focusedIdx);
+    },
+
+    /** kept for callers that predate the focus split */
     selectScene: function (idx) {
-      if (this.app) this.app.selectScene(parseInt(idx, 10));
+      this.focusScene(idx);
     },
 
     toggleSelect: function (idx) {
@@ -167,7 +252,6 @@
     },
 
     _rangeSelect: function (fromIdx, toIdx) {
-      var s = this;
       var scenes = this._scenes;
       var indices = [];
       for (var i = 0; i < scenes.length; i++) {
@@ -178,6 +262,9 @@
       var toPos = indices.indexOf(toIdx);
       if (fromPos === -1 || toPos === -1) return;
 
+      // replaces rather than extends, matching the app
+      this._selected = {};
+      this._focusedIdx = null;
       var start = Math.min(fromPos, toPos);
       var end = Math.max(fromPos, toPos);
       for (var j = start; j <= end; j++) {
@@ -198,6 +285,7 @@
 
     deselectAll: function () {
       this._selected = {};
+      this._focusedIdx = null;
       this._updateSelectionUI();
       this._notify();
     },
@@ -212,6 +300,18 @@
 
     getSelectedCount: function () {
       return Object.keys(this._selected).length;
+    },
+
+    _updateFocusUI: function () {
+      var items = document.querySelectorAll('.clip-wrapper');
+      for (var i = 0; i < items.length; i++) {
+        var idx = parseInt(items[i].dataset.index, 10);
+        if (idx === this._focusedIdx) {
+          items[i].classList.add('focused');
+        } else {
+          items[i].classList.remove('focused');
+        }
+      }
     },
 
     _updateSelectionUI: function () {

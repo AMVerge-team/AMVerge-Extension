@@ -27,6 +27,9 @@
   --text-dim: rgba(255, 255, 255, 0.7);
   --text-faint: rgba(255, 255, 255, 0.45);
   --font: 'Jersey 10', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  /* body copy: Jersey is a display face and gets muddy at 11px, so anything
+     the user actually reads a sentence of uses a normal UI face instead */
+  --font-ui: Arial, Helvetica, system-ui, sans-serif;
   --font-mono: 'Consolas', 'Courier New', monospace;
   --radius: 8px;
   --radius-sm: 4px;
@@ -208,13 +211,6 @@ input, select, textarea { font-family: var(--font); }
   background: rgba(0, 0, 0, 0.2);
 }
 
-.sidebar-logo-img {
-  width: 24px;
-  height: 24px;
-  display: block;
-  margin: 0 auto;
-  filter: drop-shadow(0 0 8px rgba(var(--accent-rgb), 0.45));
-}
 
 .sidebar-nav {
   display: flex;
@@ -332,32 +328,8 @@ input, select, textarea { font-family: var(--font); }
    LOGOS & PROMPT
    ==================== */
 
-.setup-logo {
-  width: 140px;
-  display: block;
-  margin: 0 auto var(--space-sm);
-  filter: var(--logo-filter, hue-rotate(0deg)) drop-shadow(0 0 10px rgba(var(--accent-rgb), 0.3));
-  transition: filter var(--transition);
-}
 
-.idle-logo {
-  width: 110px;
-  display: block;
-  margin: 0 auto var(--space-sm);
-  opacity: 0.9;
-  filter: var(--logo-filter, hue-rotate(0deg)) drop-shadow(0 0 16px rgba(var(--accent-rgb), 0.35));
-  animation: logoPulse 4s ease-in-out infinite alternate;
-  transition: filter var(--transition);
-}
 
-.sidebar-logo-img {
-  width: 24px;
-  height: 24px;
-  display: block;
-  margin: 0 auto;
-  filter: var(--logo-filter, hue-rotate(0deg)) drop-shadow(0 0 6px rgba(var(--accent-rgb), 0.4));
-  transition: filter var(--transition);
-}
 
 @keyframes logoPulse {
   0% { transform: scale(1); filter: var(--logo-filter, hue-rotate(0deg)) drop-shadow(0 0 12px rgba(var(--accent-rgb), 0.25)); }
@@ -489,3 +461,58 @@ input, select, textarea { font-family: var(--font); }
   box-shadow: 0 0 12px rgba(239, 68, 68, 0.35);
 }
 
+
+/* Jersey 10 ships one weight (400). Asking for 600 or 700 makes the browser
+   synthesise a fake bold, which on a pixel face just smears the glyphs. Every
+   element using the display font is pinned back to the weight that exists;
+   emphasis comes from size and colour instead. */
+body,
+h1, h2, h3, h4, h5, h6,
+button,
+.mode-card-title,
+.setup-subtitle {
+  font-weight: 400;
+}
+
+/* ====================
+   AMVerge wordmark
+   The logo is only ever the product name set in the display font, so it is
+   rendered as text rather than shipped as a PNG. That keeps it crisp at any
+   size, recolours with the accent, and drops two image requests.
+   ==================== */
+
+.amverge-wordmark {
+  font-family: var(--font);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.5px;
+  color: var(--text);
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* the "AMV" half carries the accent, the rest stays foreground */
+.amverge-wordmark .wm-accent {
+  color: var(--accent);
+  text-shadow: 0 0 12px rgba(var(--accent-rgb), 0.45);
+}
+
+/* full lockup, used on the setup gate and the idle home screen */
+.amverge-wordmark-full {
+  display: block;
+  font-size: 42px;
+  text-align: center;
+  margin: 0 auto 6px;
+}
+
+/* compact mark, used in the sidebar rail and the about dialog header */
+.amverge-wordmark-mini {
+  display: inline-block;
+  font-size: 16px;
+}
+
+/* sized to the two-line block beside it (15px title + 10px tagline) so the
+   mark reads as its equal rather than a small icon in front of it */
+.about-wordmark {
+  font-size: 28px;
+}

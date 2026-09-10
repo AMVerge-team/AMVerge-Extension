@@ -53,6 +53,14 @@
       if (clearBtn) clearBtn.style.display = settings.backgroundImagePath ? 'inline-flex' : 'none';
       if (btnLabel) btnLabel.textContent = settings.backgroundImagePath ? 'Change' : 'Upload';
 
+      // opacity and blur only act on a background image, so they are hidden
+      // until there is one rather than sitting there doing nothing
+      var hasBackground = !!settings.backgroundImagePath;
+      var opacityRow = document.getElementById('bgOpacityRow');
+      var blurRow = document.getElementById('bgBlurRow');
+      if (opacityRow) opacityRow.style.display = hasBackground ? '' : 'none';
+      if (blurRow) blurRow.style.display = hasBackground ? '' : 'none';
+
       var hexInput = document.getElementById('hexInput');
       var color = settings.accentColor || '#22c55e';
       if (hexInput) hexInput.value = color.replace('#', '');

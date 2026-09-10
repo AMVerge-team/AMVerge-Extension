@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   var AmvergeHandler = {
     _proc: null,
     _cancelling: false,
@@ -23,7 +23,9 @@
       this._onError = callbacks.onError || null;
 
       var method = opts.method || 'keyframe';
-      var pythonPath = opts.pythonPath || 'python';
+      // `{ command, prefix }` from App._resolveCli. the fallback keeps this
+      // callable on its own, and matches the pre-console-script behaviour
+      var cli = opts.cli || { command: opts.pythonPath || 'python', prefix: ['-m', 'amverge'] };
 
       if (!window.FileSystem || !window.FileSystem.childProcess) {
         if (this._onError) this._onError('FileSystem not available');
@@ -32,18 +34,20 @@
 
       window.FileSystem.createFolder(outputDir);
 
-      this._runDetect(videoPath, method, pythonPath, opts);
+      this._runDetect(videoPath, method, cli, opts);
     },
 
-    _runDetect: function (videoPath, method, pythonPath, extraOpts) {
+    _runDetect: function (videoPath, method, cli, extraOpts) {
       var s = this;
       var cliMethod = (method === 'transnetv2_gpu' || method === 'transnetv2') ? 'transnetv2' : 'keyframe';
-      var args = ['-m', 'amverge', 'detect', '--method', cliMethod, '--ipc', '--output', this._outputDir, videoPath];
+      var args = cli.prefix.concat([
+        'detect', '--method', cliMethod, '--ipc', '--output', this._outputDir, videoPath
+      ]);
 
-      dbg('info', 'Amverge', 'Spawning CLI: ' + pythonPath + ' ' + args.join(' '));
+      dbg('info', 'Amverge', 'Spawning CLI: ' + cli.command + ' ' + args.join(' '));
 
       try {
-        this._proc = window.FileSystem.childProcess.spawn(pythonPath, args, { windowsHide: true });
+        this._proc = window.FileSystem.childProcess.spawn(cli.command, args, { windowsHide: true });
       } catch (e) {
         if (this._onError) this._onError('Failed to spawn amverge: ' + e.message);
         return;

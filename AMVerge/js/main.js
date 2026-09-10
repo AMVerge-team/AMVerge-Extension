@@ -3,7 +3,7 @@
     settings: {
       pythonPath: '',
       outputDir: '',
-      detectionMethod: 'transnetv2_gpu',
+      detectionMethod: 'keyframe_detection',
       layerPrefix: 'AMVerge_',
       autoScale: true,
       accentColor: '#22c55e',
@@ -71,6 +71,7 @@
       window.ClipsPanel.init(this);
       window.PreviewPanel.init(this);
       window.SettingsPanel.init(this);
+      window.AiInstallModal.init(this);
       window.ToolsSetup.init(this);
       window.HistoryPanel.init(this);
 
@@ -299,7 +300,7 @@
         method: this.settings.detectionMethod,
         threshold: this.settings.threshold || 0.5,
         decodeMethod: this.settings.decodeMethod || 'ffmpeg',
-        pythonPath: this.settings.pythonPath || 'python'
+        cli: this._resolveCli()
       }, {
         onProgress: function (pct, msg, stage) {
           window.ImportPanel.setProgress(pct, msg);
@@ -317,13 +318,80 @@
           window.showToast('Detected ' + scenes.length + ' scenes', 'success');
         },
         onError: function (err) {
-          window.ImportPanel.hide();
           document.getElementById('importArea').style.display = '';
           document.getElementById('scenePanel').style.display = 'none';
+          // restore the idle controls, not just the container that holds them
+          window.ImportPanel.showIdle();
+
+          // a missing AI pack is a setup problem, not a failure to report as
+          // one, so it offers the install instead of a red toast
+          if (window.AiInstallModal && window.AiInstallModal.looksLikeMissingMlPack(err)) {
+            window.AiInstallModal.open();
+            dbg('warn', 'App', 'AI pack missing: ' + err);
+            return;
+          }
+
           window.showToast('Detection failed: ' + err, 'error');
           dbg('error', 'App', err);
         }
       });
+    },
+
+    /** how to invoke the CLI: `{ command, prefix }`.
+     *
+     * The console script is preferred over `python -m amverge` everywhere it
+     * exists. A wheel install does not necessarily ship `amverge/__main__.py`,
+     * and `-m` then fails outright with "package cannot be directly executed",
+     * which is exactly what the app's own venv does. The script is generated
+     * from the project entry point, so it is always present.
+     *
+     * Order: an explicit setting, then the desktop app's AI venv so a pack
+     * installed in the app is shared here, then PATH.
+     */
+    _resolveCli: function () {
+      return this._resolveCliCandidates()[0];
+    },
+
+    /** every CLI worth trying, in the same preference order.
+     *
+     * Detection has to run in one specific environment, the one holding the AI
+     * packs, so it takes the first of these and stops. Preview proxies only
+     * need ffmpeg, and the preferred CLI is often an older release than a local
+     * checkout, so that path walks the whole list until one knows the command.
+     */
+    _resolveCliCandidates: function () {
+      var fs = window.FileSystem;
+      var list = [];
+
+      if (this.settings.pythonPath) {
+        var sibling = fs && fs.siblingCliFor ? fs.siblingCliFor(this.settings.pythonPath) : null;
+        if (sibling) list.push({ command: sibling, prefix: [] });
+        else list.push({ command: this.settings.pythonPath, prefix: ['-m', 'amverge'] });
+      }
+
+      if (fs && fs.getAppAiCli) {
+        var shared = fs.getAppAiCli();
+        if (shared) {
+          dbg('info', 'App', 'Using desktop app AI environment: ' + shared);
+          list.push({ command: shared, prefix: [] });
+        }
+      }
+
+      // PATH, console script first. spawning a name that is not installed just
+      // raises ENOENT, which the caller treats as "try the next one"
+      list.push({ command: 'amverge', prefix: [] });
+      list.push({ command: 'python', prefix: ['-m', 'amverge'] });
+      return list;
+    },
+
+    /** the interpreter behind `_resolveCli`, for anything that needs pip */
+    _resolvePython: function () {
+      if (this.settings.pythonPath) return this.settings.pythonPath;
+      if (window.FileSystem && window.FileSystem.getAppAiPython) {
+        var shared = window.FileSystem.getAppAiPython();
+        if (shared) return shared;
+      }
+      return 'python';
     },
 
     // --- Scene selection & preview ---
@@ -336,11 +404,31 @@
       }
       if (scene) {
         window.PreviewPanel.showScene(scene);
+      } else {
+        // a silent miss here was indistinguishable from a broken preview
+        dbg('error', 'App', 'No scene matching idx=' + idx +
+            ' among ' + this._currentScenes.length + ' scenes');
       }
-      window.ClipsPanel._selected = {};
-      window.ClipsPanel._selected[idx] = true;
-      window.ClipsPanel._updateSelectionUI();
-      window.ClipsPanel._notify();
+      // deliberately does not touch the selection: focusing a clip to look at
+      // it must not discard what the user has ticked for export
+    },
+
+    /** back to the import screen, dropping the loaded episode.
+     *
+     * The panel otherwise has no way out of a loaded episode: once the scene
+     * grid is up it stays up for the session, and the only route back is
+     * reloading the extension.
+     */
+    closeEpisode: function () {
+      this._currentScenes = [];
+      this._currentVideo = null;
+
+      window.ClipsPanel.loadScenes([]);
+      window.PreviewPanel.clearPreview();
+
+      document.getElementById('scenePanel').style.display = 'none';
+      document.getElementById('importArea').style.display = '';
+      window.ImportPanel.showIdle();
     },
 
     // --- Import to AE ---
@@ -503,6 +591,7 @@
         this.settings.backgroundImagePath = mediaPath;
         this.applyBackgroundMedia();
         window.StorageManager.saveSettings(this.settings);
+        if (window.SettingsPanel) window.SettingsPanel.populate(this.settings);
         window.showToast('Background media applied', 'success');
       }
     },
@@ -511,6 +600,7 @@
       this.settings.backgroundImagePath = null;
       this.applyBackgroundMedia();
       window.StorageManager.saveSettings(this.settings);
+      if (window.SettingsPanel) window.SettingsPanel.populate(this.settings);
       window.showToast('Background media cleared', 'info');
     },
 
@@ -822,7 +912,7 @@
       this.settings = {
         pythonPath: '',
         outputDir: '',
-        detectionMethod: 'transnetv2_gpu',
+        detectionMethod: 'keyframe_detection',
         layerPrefix: 'AMVerge_',
         autoScale: true,
         accentColor: '#22c55e',

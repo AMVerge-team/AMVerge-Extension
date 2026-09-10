@@ -26,7 +26,7 @@
 .settings-subheading {
   margin: var(--space-md) 0 var(--space-sm);
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 400;
   color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 0.8px;
@@ -256,3 +256,59 @@
   text-transform: uppercase;
 }
 
+
+/* Narrow panel: stack each row instead of letting the label and its control
+   collide.
+   
+   A row is normally label-left / control-right, but the controls have fixed
+   widths (the text input is 170px, selects size to their longest option) and
+   the labels are nowrap, so neither side gives when the panel gets dragged
+   narrow. Below this width the row becomes two lines and the control takes the
+   full width, which is more usable than a squeezed one anyway.
+   
+   Media query rather than a container query: CEP ships an older Chromium and
+   container queries are not reliably available there. */
+@media (max-width: 480px) {
+  .settings-row {
+    flex-direction: column;
+    align-items: stretch;
+    /* a control on its own line needs real separation from its label, more so
+       when it is a button or a checkbox, neither of which has padding of its
+       own to space it out */
+    gap: 10px;
+    padding: 12px 0;
+  }
+
+  /* the label can wrap now that it owns a whole line. min-height on the row is
+     dropped so a stacked row is sized by its content instead of being squeezed
+     back toward the single-line height */
+  .settings-label {
+    white-space: normal;
+    line-height: 1.35;
+  }
+
+  .settings-row {
+    min-height: 0;
+  }
+
+  .settings-control {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .settings-text-input,
+  .settings-select {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* a checkbox, colour swatch or browse button would look odd stretched, so
+     they keep their size and the text field takes the slack beside them */
+  .settings-control > .custom-checkbox,
+  .settings-control > .color-picker-container,
+  .settings-control > .button {
+    flex: 0 0 auto;
+    width: auto;
+  }
+}

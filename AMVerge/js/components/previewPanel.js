@@ -5,6 +5,7 @@
     init: function (app) {
       this.app = app;
       this.video = document.getElementById('previewVideo');
+      if (window.VideoPlayer) window.VideoPlayer.init();
       this.empty = document.getElementById('previewEmpty');
       this.window = document.getElementById('previewWindow');
       this.info = document.getElementById('sceneInfo');
@@ -22,14 +23,56 @@
       this._currentScene = scene;
       this.empty.style.display = 'none';
 
+      // the cut clip the pipeline produced. `collect_scenes` names these
+      // optimistically, so a scene can carry a path for a file ffmpeg never
+      // actually wrote; when that happens fall back to the source video seeked
+      // to the scene's range rather than showing a blank player
       var clipPath = scene.clip_path || scene.path || '';
+      var range = null;
+
+      var missing = clipPath && window.FileSystem && window.FileSystem.fileExists &&
+                    !window.FileSystem.fileExists(clipPath);
+      if (missing) dbg('warn', 'Preview', 'Clip not on disk: ' + clipPath);
+
+      if ((!clipPath || missing) && this.app && this.app._currentVideo) {
+        clipPath = this.app._currentVideo;
+        range = {
+          start: scene.start_sec || scene.start || 0,
+          end: scene.end_sec || scene.end || 0
+        };
+      } else if (missing) {
+        clipPath = '';
+      }
+
       if (clipPath) {
-        var fileUrl = 'file:///' + encodeURI(clipPath.replace(/\\/g, '/'));
-        this.video.src = fileUrl;
-        this.video.style.display = '';
-        this.video.load();
+        var self = this;
+
+        var play = function (finalPath) {
+          // a later click can land while the proxy is still building, so the
+          // result is dropped unless this is still the scene on screen
+          if (self._currentScene !== scene) return;
+          var fileUrl = 'file:///' + encodeURI(finalPath.replace(/\\/g, '/'));
+          dbg('info', 'Preview', 'Loading ' + fileUrl +
+              (range ? ' @ ' + range.start + '-' + range.end : ''));
+          window.VideoPlayer.setBusy(false);
+          window.VideoPlayer.load(fileUrl, range);
+        };
+
+        this.empty.style.display = 'none';
+
+        // usually already built, in which case this plays without a spinner.
+        // the spinner is only for the clip that outruns the background queue
+        var ready = window.PreviewProxy ? window.PreviewProxy.cached(clipPath) : clipPath;
+        if (ready) {
+          play(ready);
+        } else {
+          window.VideoPlayer.setBusy(true);
+          window.PreviewProxy.request(clipPath, play, true);
+        }
       } else {
-        this.video.style.display = 'none';
+        dbg('warn', 'Preview', 'No playable source for this scene');
+        window.VideoPlayer.clear();
+        this.empty.style.display = '';
       }
 
       this.info.style.display = '';
@@ -44,8 +87,7 @@
     clearPreview: function () {
       this._currentScene = null;
       this.empty.style.display = '';
-      this.video.style.display = 'none';
-      this.video.src = '';
+      window.VideoPlayer.clear();
       this.info.style.display = 'none';
       this._updateNavButtons();
     },

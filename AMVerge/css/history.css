@@ -89,7 +89,7 @@
 
 .history-empty-title {
   font-size: var(--text-lg);
-  font-weight: 600;
+  font-weight: 400;
   color: var(--text);
   margin: 0 0 4px;
   letter-spacing: 0.5px;

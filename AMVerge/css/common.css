@@ -105,7 +105,7 @@
 }
 
 .about-team-name {
-  font-weight: 600;
+  font-weight: 400;
   color: var(--text);
 }
 
@@ -224,3 +224,319 @@
 }
 .project-picker-item + .project-picker-item { margin-top: 2px; }
 
+
+/* Toasts are prose the user reads under time pressure, so they use the UI face
+   rather than the pixel display font. */
+.toast {
+  font-family: var(--font-ui);
+}
+
+/* The about dialog is the densest prose in the panel, and the pixel font makes
+   it genuinely hard to read at 11px. Everything inside switches to the UI face;
+   the section headers stay on the display font, since they are short, uppercase
+   and act as landmarks rather than something you read a line at a time. */
+.about-scroll-body,
+.about-scroll-body li,
+.about-scroll-body p,
+.about-team-name,
+.about-team-role {
+  font-family: var(--font-ui);
+}
+
+.about-scroll-body h4 {
+  font-family: var(--font);
+}
+
+/* the term each bullet defines. Arial has a real bold, so this is genuine
+   weight rather than the synthesised kind the display font would produce */
+.about-scroll-body strong {
+  font-weight: 700;
+}
+
+
+
+/* ====================
+   About dialog
+   ==================== */
+
+/* the close control is anchored to the dialog, not to the header row, so the
+   header is only identity and the X reads as chrome */
+.modal-content.modal-large {
+  position: relative;
+}
+
+.modal-close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  /* equal width and height: the shared .button sizes to its content, which made
+     a single icon render as a wide pill */
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.modal-close-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.3);
+}
+
+.about-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* clears the corner button so a long title cannot run under it */
+  padding: 0 34px 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+/* product name, so it keeps the display font at its only real weight */
+.about-title {
+  margin: 0;
+  font-family: var(--font);
+  font-weight: 400;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.about-tagline {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+.about-footer {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.about-version {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+/* Bullets, aligned to the section headers above them.
+   
+   The default marker sits wherever the browser puts it and its gap is not
+   controllable, so the list is unstyled and the dot drawn as a pseudo-element.
+   That allows both the indent and the dot-to-text gap to be set directly. */
+.about-scroll-body ul,
+.about-scroll-body ol {
+  list-style: none;
+  margin: 0 0 10px;
+  padding-left: 2px;
+}
+
+.about-scroll-body li {
+  position: relative;
+  /* room for the dot plus its gap, and the hanging indent that keeps a wrapped
+     second line flush with the first rather than under the dot */
+  padding-left: 11px;
+  margin-bottom: 5px;
+  /* explicit, so a wide dialog cannot stretch the words apart */
+  text-align: left;
+}
+
+.about-scroll-body li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.5em;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+
+.about-scroll-body p {
+  text-align: left;
+}
+
+/* ====================
+   AI install dialog
+   Ported from the desktop app's `aiInstall.css` and `postExportModal.css` so the
+   two dialogs read as the same product. Class names are kept identical to the
+   app's on purpose: if that styling changes, the diff is obvious here.
+   Variables are remapped to the extension's own tokens.
+   ==================== */
+
+.pxm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.78);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pxm-modal {
+  width: 380px;
+  max-width: 92vw;
+  padding: 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: rgba(20, 20, 20, 0.96);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75), 0 0 40px rgba(var(--accent-rgb), 0.12);
+}
+
+.pxm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pxm-title {
+  font-family: var(--font);
+  font-weight: 400;
+  font-size: 14px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.aid-lede {
+  margin: 0 0 8px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.aid-lede strong { color: var(--accent); }
+
+.aid-note {
+  margin: 0 0 12px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+
+.aid-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 14px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--inset);
+}
+
+.aid-facts > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.aid-facts dt {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-faint);
+}
+
+.aid-facts dd {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text);
+  text-align: right;
+  /* the interpreter path can be long, so it wraps rather than widening the box */
+  overflow-wrap: anywhere;
+}
+
+.aid-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.aid-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
+  color: var(--text-dim);
+  font-family: var(--font);
+  font-weight: 400;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.aid-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.aid-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.aid-btn-primary {
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb), 0.16);
+  color: var(--accent);
+}
+
+.pxm-progress { margin-bottom: 10px; }
+
+.pxm-bar-label {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-faint);
+}
+
+.pxm-message {
+  margin: 0 0 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  /* pip output is arbitrary length; keep it from stretching the dialog */
+  overflow-wrap: anywhere;
+}
+
+.pxm-errors {
+  margin: 0 0 12px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  line-height: 1.45;
+  color: #ff8f8f;
+  overflow-wrap: anywhere;
+}
+
+/* pip reports no percentage, so the bar sweeps rather than claiming progress
+   it does not know */
+.aid-fill-indeterminate {
+  animation: aidSweep 1.1s ease-in-out infinite;
+}
+
+@keyframes aidSweep {
+  0%   { opacity: 0.35; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.35; }
+}

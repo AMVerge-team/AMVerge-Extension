@@ -78,6 +78,20 @@
       this._stopTimer();
       document.getElementById('importIdle').style.display = 'none';
       document.getElementById('importProgress').style.display = 'none';
+    },
+
+    /** back to the pick-a-video state.
+     *
+     * `hide()` blanks both the idle and progress views, which is correct when
+     * the caller is about to hide the whole import area (the success path
+     * switches to the scene grid). A failure leaves the area on screen, so it
+     * has to come back here or the panel renders as an empty background with no
+     * controls, and stays that way until the extension is reloaded.
+     */
+    showIdle: function () {
+      this._stopTimer();
+      document.getElementById('importProgress').style.display = 'none';
+      document.getElementById('importIdle').style.display = '';
     }
   };
 

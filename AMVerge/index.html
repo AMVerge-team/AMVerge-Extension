@@ -41,6 +41,11 @@
       <symbol id="icon-bug" viewBox="0 0 24 24"><path d="M9 8h6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 20v-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M16 20v-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M8 16a4 4 0 01-4-4v-2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M16 16a4 4 0 004-4v-2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3 13h2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M19 13h2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M12 4v4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
       <symbol id="icon-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
       <symbol id="icon-sync" viewBox="0 0 24 24"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 11-.57-8.38l5.67-5.19" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-play" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></symbol>
+      <symbol id="icon-pause" viewBox="0 0 24 24"><path d="M7 4.5h3.5v15H7zM13.5 4.5H17v15h-3.5z" fill="currentColor"/></symbol>
+      <symbol id="icon-volume" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4z" fill="currentColor"/><path d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+      <symbol id="icon-volume-mute" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+      <symbol id="icon-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     </defs>
   </svg>
 
@@ -56,7 +61,7 @@
       <nav class="sidebar" id="sidebar">
         <div class="sidebar-top">
           <div class="sidebar-logo">
-            <img src="LogoAMVerge.png" alt="AMVerge" class="sidebar-logo-img">
+            <span class="amverge-wordmark amverge-wordmark-mini"><span class="wm-accent">AMV</span></span>
           </div>
           <div class="sidebar-nav">
             <button class="sidebar-btn active" data-page="home" data-label="Scenes" onclick="App.switchTab('home')">
@@ -119,15 +124,17 @@
 
   <div id="aboutModal" class="modal-overlay" style="display:none">
     <div class="modal-content modal-large">
-      <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:10px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <img src="LogoAMVerge.png" alt="AMVerge" style="width:24px;height:24px;filter:drop-shadow(0 0 8px rgba(var(--accent-rgb),0.5))">
-          <div>
-            <h2 class="settings-heading" style="margin:0;font-size:15px">AMVerge Extension</h2>
-            <p style="color:var(--text-faint);font-size:10px;margin:0">Scene Detection & Direct Layer Import</p>
-          </div>
+      <button class="modal-close-btn" aria-label="Close"
+              onclick="document.getElementById('aboutModal').style.display='none'">
+        <svg class="icon"><use href="#icon-x"/></svg>
+      </button>
+
+      <div class="about-header">
+        <span class="amverge-wordmark amverge-wordmark-mini about-wordmark"><span class="wm-accent">AMV</span></span>
+        <div>
+          <h2 class="about-title">AMVerge Extension</h2>
+          <p class="about-tagline">Scene Detection &amp; Direct Layer Import</p>
         </div>
-        <button class="button button-small" onclick="document.getElementById('aboutModal').style.display='none'"><svg class="icon"><use href="#icon-x"/></svg></button>
       </div>
 
       <div class="about-scroll-body">
@@ -161,9 +168,54 @@
         </div>
       </div>
 
-      <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:10px">
-        <span style="font-size:10px;color:var(--text-faint);font-family:var(--font-mono)">v1.0.0 (amverge CLI backend)</span>
-        <button class="button button-accent button-small" onclick="document.getElementById('aboutModal').style.display='none'">Close</button>
+      <div class="about-footer">
+        <span class="about-version">v1.0.0 (amverge CLI backend)</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="aiInstallModal" class="pxm-overlay" style="display:none">
+    <div class="pxm-modal aid-modal">
+      <header class="pxm-header">
+        <span class="pxm-title">AI Scene Detection</span>
+      </header>
+
+      <div id="aiInstallConfirm">
+        <p class="aid-lede">
+          You don't have <strong>TransNetV2</strong> installed. Would you like to install it now?
+        </p>
+        <p class="aid-note">
+          Finds scene cuts with AI. More accurate than keyframe detection, and fast on an
+          NVIDIA GPU.
+        </p>
+        <dl class="aid-facts">
+          <div>
+            <dt>Download</dt>
+            <dd>~2.7 GB (includes PyTorch)</dd>
+          </div>
+          <div>
+            <dt>Installing into</dt>
+            <dd id="aiInstallTarget">python</dd>
+          </div>
+        </dl>
+        <div class="aid-buttons">
+          <button type="button" class="aid-btn" onclick="AiInstallModal.close()">Not now</button>
+          <button type="button" class="aid-btn aid-btn-primary" onclick="AiInstallModal.install()">Install</button>
+        </div>
+      </div>
+
+      <div id="aiInstallProgress" style="display:none">
+        <div class="pxm-progress">
+          <span class="pxm-bar-label">Progress</span>
+          <div class="progress-bar pxm-bar">
+            <div class="progress-fill" id="aiInstallFill" style="width:100%"></div>
+          </div>
+        </div>
+        <p class="pxm-message" id="aiInstallMessage"></p>
+        <p class="pxm-errors" id="aiInstallErrors" style="display:none"></p>
+        <div class="aid-buttons">
+          <button type="button" class="aid-btn" id="aiInstallCloseBtn" onclick="AiInstallModal.cancel()">Cancel</button>
+        </div>
       </div>
     </div>
   </div>
@@ -175,10 +227,13 @@
   <script src="js/utils/storage.js"></script>
   <script src="js/utils/fileSystem.js"></script>
   <script src="js/utils/amvergeHandler.js"></script>
+  <script src="js/utils/previewProxy.js"></script>
   <script src="js/components/importPanel.js"></script>
   <script src="js/components/clipsPanel.js"></script>
+  <script src="js/components/videoPlayer.js"></script>
   <script src="js/components/previewPanel.js"></script>
   <script src="js/components/settingsPanel.js"></script>
+  <script src="js/components/aiInstallModal.js"></script>
   <script src="js/components/toolsSetup.js"></script>
   <script src="js/components/historyPanel.js"></script>
   <script src="js/main.js"></script>

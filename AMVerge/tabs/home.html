@@ -1,7 +1,7 @@
 <div id="page-home" class="page active">
   <div id="importArea" class="import-area">
     <div id="importIdle" class="import-idle">
-      <img src="LogoAMVergeFull.png" alt="AMVerge" class="idle-logo">
+      <span class="amverge-wordmark amverge-wordmark-full"><span class="wm-accent">AMV</span>erge</span>
       
       <div id="aeLayerActionWrap" class="ae-layer-action-wrap" style="display:none">
         <button class="button button-accent button-large button-full" id="detectActiveLayerBtn" onclick="App.startImportFromActiveLayer()">
@@ -58,6 +58,10 @@
       <div class="left-pane">
         <div class="pane-header">
           <div class="pane-header-left">
+            <button class="pane-action-btn" id="closeEpisodeBtn"
+                    onclick="App.closeEpisode()" title="Close episode">
+              <svg class="icon"><use href="#icon-chevron-left"/></svg>
+            </button>
             <span class="pane-title">Scenes</span>
             <span class="scene-count" id="sceneCount">0</span>
           </div>
@@ -100,7 +104,42 @@
               <svg class="icon"><use href="#icon-video"/></svg>
               <p>Select a scene</p>
             </div>
-            <video class="preview-video" id="previewVideo" style="display:none" controls></video>
+            <!-- same structure the desktop app uses: .video-wrapper > .video-frame
+                 > video + .controls, so the skin and its CSS port across as-is -->
+            <div class="video-wrapper" id="previewPlayer" style="display:none">
+              <div class="video-frame">
+                <video class="preview-video" id="previewVideo" playsinline></video>
+                <div class="video-busy" aria-hidden="true">
+                  <span class="video-busy-spinner"></span>
+                  <span>Preparing preview...</span>
+                </div>
+                <div class="controls">
+                  <button type="button" id="pvPlayBtn" aria-label="Play">
+                    <svg class="icon"><use href="#icon-play"/></svg>
+                  </button>
+
+                  <span class="time-display" id="pvTime">0:00 / 0:00</span>
+
+                  <div class="progress" id="pvProgress">
+                    <progress id="pvProgressBar" value="0" max="1"></progress>
+                  </div>
+
+                  <div class="volume-control" id="pvVolumeControl">
+                    <button type="button" id="pvMuteBtn" aria-label="Mute">
+                      <svg class="icon"><use href="#icon-volume"/></svg>
+                    </button>
+                    <div class="volume-popup">
+                      <input type="range" class="volume-slider" id="pvVolume"
+                             min="0" max="1" step="0.01" value="1" aria-label="Volume">
+                    </div>
+                  </div>
+
+                  <button type="button" id="pvFullscreenBtn" aria-label="Fullscreen">
+                    <svg class="icon"><use href="#icon-expand"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="scene-info" id="sceneInfo" style="display:none">
             <div class="scene-info-row">

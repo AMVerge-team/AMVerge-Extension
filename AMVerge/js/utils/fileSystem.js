@@ -172,6 +172,68 @@
       }
     },
 
+    /** Python interpreter from the desktop app's managed AI environment, or null.
+     *
+     * The app provisions one venv for its AI packs (torch and friends, several
+     * GB) at `<appdata>/app.amverge/pyenv`. Pointing the extension at the same
+     * interpreter means a pack installed in the app is immediately usable here,
+     * instead of the user installing torch a second time into a different
+     * Python that knows nothing about it.
+     *
+     * Returns null when the app has never provisioned it, in which case the
+     * caller falls back to the configured or PATH python.
+     */
+    getAppAiPython: function () {
+      try {
+        var path = this.path;
+        var roaming = process.env.APPDATA || path.join(this.getHomeDir(), 'AppData', 'Roaming');
+        var candidates = [
+          // windows
+          path.join(roaming, 'app.amverge', 'pyenv', 'Scripts', 'python.exe'),
+          // macos
+          path.join(this.getHomeDir(), 'Library', 'Application Support', 'app.amverge', 'pyenv', 'bin', 'python'),
+          // linux
+          path.join(this.getHomeDir(), '.local', 'share', 'app.amverge', 'pyenv', 'bin', 'python')
+        ];
+
+        for (var i = 0; i < candidates.length; i++) {
+          if (this.fileExists(candidates[i])) return candidates[i];
+        }
+      } catch (e) {
+        dbg('warn', 'FileSystem', 'getAppAiPython failed: ' + e);
+      }
+      return null;
+    },
+
+    /** the `amverge` console script from the app's AI venv, or null.
+     *
+     * Preferred over `python -m amverge`, because a wheel install does not
+     * necessarily ship `amverge/__main__.py` and `-m` then fails with "package
+     * cannot be directly executed". The console script is generated from the
+     * project's entry point, so it exists in every install, and it is what the
+     * desktop app itself spawns.
+     */
+    getAppAiCli: function () {
+      var python = this.getAppAiPython();
+      return python ? this.siblingCliFor(python) : null;
+    },
+
+    /** the `amverge` script that sits beside a given interpreter, or null */
+    siblingCliFor: function (pythonPath) {
+      try {
+        var path = this.path;
+        var binDir = path.dirname(pythonPath);
+        var names = process.platform === 'win32' ? ['amverge.exe', 'amverge.cmd'] : ['amverge'];
+        for (var i = 0; i < names.length; i++) {
+          var candidate = path.join(binDir, names[i]);
+          if (this.fileExists(candidate)) return candidate;
+        }
+      } catch (e) {
+        dbg('warn', 'FileSystem', 'siblingCliFor failed: ' + e);
+      }
+      return null;
+    },
+
     readAppTheme: function () {
       if (!fs || !path || !os) return null;
       try {
