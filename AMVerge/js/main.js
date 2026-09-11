@@ -74,6 +74,7 @@
       window.AiInstallModal.init(this);
       window.ToolsSetup.init(this);
       window.HistoryPanel.init(this);
+      window.CutProgressCard.init();
 
       var s = this;
       window.ClipsPanel.onSelectionChange(function (count) {
@@ -296,6 +297,11 @@
       window.ImportPanel.showProgress();
       document.getElementById('scenePanel').style.display = 'none';
 
+      // set once phase 1 hands the grid over, so the completion path knows to
+      // merge into a grid the user may already have been picking clips in
+      this._gridLive = false;
+      window.CutProgressCard.reset();
+
       window.AmvergeHandler.detect(videoPath, outputDir, {
         method: this.settings.detectionMethod,
         threshold: this.settings.threshold || 0.5,
@@ -305,19 +311,90 @@
         onProgress: function (pct, msg, stage) {
           window.ImportPanel.setProgress(pct, msg);
         },
-        onComplete: function (result) {
-          var scenes = result.scenes || [];
-          if (scenes.length > 0) {
-            s._currentScenes = scenes;
-            window.ClipsPanel.loadScenes(scenes);
+
+        // the full scene list arrives before any clip is cut. held until phase
+        // 1, because a grid of tiles with nothing behind them is not useful
+        onInitialClips: function (clips) {
+          s._currentScenes = clips;
+        },
+
+        onClipReady: function (idx, clipPath, mode) {
+          for (var i = 0; i < s._currentScenes.length; i++) {
+            var sc = s._currentScenes[i];
+            var sIdx = sc.scene_index !== undefined ? sc.scene_index : i;
+            if (sIdx !== idx) continue;
+            sc.clip_path = clipPath;
+            sc.path = clipPath;
+            break;
           }
+          // before the grid is live these are phase 1 clips, and loadScenes
+          // renders all of them at once. anything arriving after it belongs to
+          // the slow phase, whatever cut mode it ended up using: reencode and
+          // smartcut both land here, so the log follows the phase, not the mode
+          if (s._gridLive) {
+            window.ClipsPanel.applyClip(idx, clipPath, mode);
+            window.CutProgressCard.log('scene ' + (idx + 1) + ' · ' + (mode || 'done'));
+          }
+        },
+
+        onThumbnail: function (idx) {
+          if (s._gridLive) window.ClipsPanel.markThumbnail(idx);
+        },
+
+        // the lossless clips are all cut. everything left is a re-encode, which
+        // is the slow half, so the grid opens now and that runs behind it
+        onPhase1Complete: function () {
+          s._gridLive = true;
+          window.ClipsPanel.loadScenes(s._currentScenes);
           document.getElementById('importArea').style.display = 'none';
           document.getElementById('scenePanel').style.display = '';
           window.ImportPanel.hide();
+        },
+
+        onReencodeProgress: function (done, total) {
+          if (!total) return;
+          if (!window.CutProgressCard.isVisible() && done < total) {
+            window.CutProgressCard.show('Re-encoding ' + total + ' clips');
+          }
+          window.CutProgressCard.setProgress(done, total);
+        },
+
+        onComplete: function (result) {
+          var scenes = result.scenes || [];
+
+          if (s._gridLive) {
+            // the grid has been up since phase 1, so fold the finished paths
+            // and thumbnails in rather than rebuilding and losing the selection
+            window.ClipsPanel.mergeScenes(scenes);
+            s._currentScenes = window.ClipsPanel._scenes;
+            if (window.CutProgressCard.isVisible()) {
+              window.CutProgressCard.finish('Clips ready');
+            }
+          } else {
+            if (scenes.length > 0) {
+              s._currentScenes = scenes;
+              window.ClipsPanel.loadScenes(scenes);
+            }
+            document.getElementById('importArea').style.display = 'none';
+            document.getElementById('scenePanel').style.display = '';
+            window.ImportPanel.hide();
+          }
+
           window.HistoryPanel.addRun(videoPath, outputDir, scenes.length, s.settings.detectionMethod);
           window.showToast('Detected ' + scenes.length + ' scenes', 'success');
         },
         onError: function (err) {
+          window.CutProgressCard.hide();
+
+          // a failure during the re-encode phase leaves a grid full of working
+          // lossless clips. throwing the user back to the import screen would
+          // discard all of it, so the grid stays and only the toast reports
+          if (s._gridLive) {
+            window.showToast('Some clips failed to cut: ' + err, 'error');
+            dbg('error', 'App', err);
+            return;
+          }
+
           document.getElementById('importArea').style.display = '';
           document.getElementById('scenePanel').style.display = 'none';
           // restore the idle controls, not just the container that holds them
@@ -422,6 +499,8 @@
     closeEpisode: function () {
       this._currentScenes = [];
       this._currentVideo = null;
+      this._gridLive = false;
+      window.CutProgressCard.hide();
 
       window.ClipsPanel.loadScenes([]);
       window.PreviewPanel.clearPreview();

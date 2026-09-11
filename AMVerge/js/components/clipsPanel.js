@@ -53,9 +53,20 @@
       grid.innerHTML = '';
       grid.className = 'clips-grid density-' + this._density;
 
-      var scenes = this._scenes;
-      for (var i = 0; i < scenes.length; i++) {
-        var s = scenes[i];
+      for (var i = 0; i < this._scenes.length; i++) {
+        grid.appendChild(this._buildTile(this._scenes[i], i));
+      }
+    },
+
+    /** one grid tile, wired up.
+     *
+     * Built one at a time rather than as part of a single render pass, because
+     * clips stream in while cutting runs and a tile has to be replaceable on
+     * its own. Re-rendering the whole grid for each arrival would fight the
+     * user's scroll position and restart every appear animation.
+     */
+    _buildTile: function (s, i) {
+      {
         var idx = s.scene_index !== undefined ? s.scene_index : i;
 
         var wrapper = document.createElement('div');
@@ -63,7 +74,6 @@
         wrapper.style.setProperty('--appear-delay', Math.min(i * 30, 600) + 'ms');
         wrapper.dataset.index = idx;
 
-        if (s.clip_path) wrapper.classList.add('cut-ready');
         if (idx === this._focusedIdx) {
           wrapper.classList.add('focused');
         }
@@ -216,8 +226,98 @@
           });
         })(wrapper, idx, clipPath, hoverVideo, thumb, sel);
 
-        grid.appendChild(wrapper);
+        return wrapper;
       }
+    },
+
+    /** replace one tile in place, keeping the rest of the grid untouched */
+    _refreshTile: function (idx) {
+      var grid = document.getElementById('clipsGrid');
+      if (!grid) return;
+
+      for (var i = 0; i < this._scenes.length; i++) {
+        var s = this._scenes[i];
+        var sIdx = s.scene_index !== undefined ? s.scene_index : i;
+        if (sIdx !== idx) continue;
+
+        var old = grid.querySelector('.clip-wrapper[data-index="' + idx + '"]');
+        if (!old) return;
+        var fresh = this._buildTile(s, i);
+        // the appear animation is for a grid arriving all at once. replaying it
+        // on every clip that finishes cutting would make the grid twitch
+        fresh.classList.remove('clip-appear');
+        grid.replaceChild(fresh, old);
+        return;
+      }
+    },
+
+    /** a clip finished cutting: point its tile at the file that now exists */
+    applyClip: function (idx, clipPath, clipMode) {
+      for (var i = 0; i < this._scenes.length; i++) {
+        var s = this._scenes[i];
+        var sIdx = s.scene_index !== undefined ? s.scene_index : i;
+        if (sIdx !== idx) continue;
+
+        if (!clipPath) {
+          dbg('warn', 'Clips', 'Scene ' + idx + ' produced no clip (' + clipMode + ')');
+          return;
+        }
+        s.clip_path = clipPath;
+        s.path = clipPath;
+        this._refreshTile(idx);
+        return;
+      }
+    },
+
+    /** a thumbnail landed for a clip whose tile is already on screen */
+    markThumbnail: function (idx) {
+      var grid = document.getElementById('clipsGrid');
+      if (!grid) return;
+      var wrapper = grid.querySelector('.clip-wrapper[data-index="' + idx + '"]');
+      if (!wrapper) return;
+
+      var img = wrapper.querySelector('.clip-thumb');
+      if (!img || !img.getAttribute('src')) return;
+      // the <img> already tried this path and failed while the file did not
+      // exist, so it needs a URL the cache has not seen to try again
+      img.style.display = '';
+      img.src = img.getAttribute('src').split('?')[0] + '?t=' + Date.now();
+    },
+
+    /** fold the final scene list in without disturbing what the user picked.
+     *
+     * Selection and focus survive on purpose: the grid has been usable since
+     * phase 1, so by the time the last re-encode lands there may well be clips
+     * already ticked for export.
+     */
+    mergeScenes: function (scenes) {
+      var byIdx = {};
+      for (var i = 0; i < scenes.length; i++) {
+        var sc = scenes[i];
+        byIdx[sc.scene_index !== undefined ? sc.scene_index : i] = sc;
+      }
+
+      for (var j = 0; j < this._scenes.length; j++) {
+        var mine = this._scenes[j];
+        var idx = mine.scene_index !== undefined ? mine.scene_index : j;
+        var theirs = byIdx[idx];
+        if (!theirs) continue;
+
+        var clip = theirs.clip_path || theirs.path || '';
+        var changed = false;
+        if (clip && clip !== mine.clip_path) {
+          mine.clip_path = clip;
+          mine.path = clip;
+          changed = true;
+        }
+        if (theirs.thumbnail && theirs.thumbnail !== mine.thumbnail) {
+          mine.thumbnail = theirs.thumbnail;
+          changed = true;
+        }
+        if (changed) this._refreshTile(idx);
+      }
+
+      if (window.PreviewProxy) window.PreviewProxy.reset(this._scenes, this.app);
     },
 
     /** focus a clip: outline it and load it into the preview.

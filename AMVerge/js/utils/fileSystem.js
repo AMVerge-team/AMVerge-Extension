@@ -66,19 +66,25 @@
 
     deleteFolderRecursive: function (folderPath) {
       if (!fs) return;
+      // `self`, not `this`: inside the forEach callback `this` is undefined, so
+      // the recursive call threw on the first subfolder it met and the outer
+      // catch swallowed it, leaving the folder half deleted and no trace of why
+      var self = this;
       try {
         if (fs.existsSync(folderPath)) {
           fs.readdirSync(folderPath).forEach(function (file) {
             var cur = path.join(folderPath, file);
             if (fs.lstatSync(cur).isDirectory()) {
-              this.deleteFolderRecursive(cur);
+              self.deleteFolderRecursive(cur);
             } else {
               fs.unlinkSync(cur);
             }
           });
           fs.rmdirSync(folderPath);
         }
-      } catch (e) {}
+      } catch (e) {
+        dbg('warn', 'FileSystem', 'Could not fully delete ' + folderPath + ': ' + e.message);
+      }
     },
 
     getExtension: function (filePath) {

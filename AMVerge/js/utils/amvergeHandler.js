@@ -7,6 +7,11 @@
     _onProgress: null,
     _onComplete: null,
     _onError: null,
+    _onInitialClips: null,
+    _onClipReady: null,
+    _onThumbnail: null,
+    _onPhase1: null,
+    _onReencode: null,
 
     detect: function (videoPath, outputDir, opts, callbacks) {
       var s = this;
@@ -21,6 +26,13 @@
       this._onProgress = callbacks.onProgress || null;
       this._onComplete = callbacks.onComplete || null;
       this._onError = callbacks.onError || null;
+      // streaming events, emitted by the transnetv2 path only. a keyframe run
+      // never fires them and simply finishes through onComplete as before
+      this._onInitialClips = callbacks.onInitialClips || null;
+      this._onClipReady = callbacks.onClipReady || null;
+      this._onThumbnail = callbacks.onThumbnail || null;
+      this._onPhase1 = callbacks.onPhase1Complete || null;
+      this._onReencode = callbacks.onReencodeProgress || null;
 
       var method = opts.method || 'keyframe';
       // `{ command, prefix }` from App._resolveCli. the fallback keeps this
@@ -35,6 +47,64 @@
       window.FileSystem.createFolder(outputDir);
 
       this._runDetect(videoPath, method, cli, opts);
+    },
+
+    /** handle one streaming IPC line, returning true when it was one.
+     *
+     * The CLI emits these on stderr while cutting, so a viewer can show its
+     * grid at PHASE1_COMPLETE and let the slow re-encode phase fill in behind
+     * it. Anything unrecognised falls through to the log.
+     */
+    _handleEvent: function (line) {
+      var s = this;
+
+      if (line.indexOf('INITIAL_CLIPS_READY|') === 0) {
+        var raw = line.slice('INITIAL_CLIPS_READY|'.length);
+        var clips;
+        try {
+          clips = JSON.parse(raw);
+        } catch (e) {
+          dbg('warn', 'Amverge', 'Unreadable INITIAL_CLIPS_READY payload');
+          return true;
+        }
+        this._scenes = clips;
+        if (this._onInitialClips) this._onInitialClips(clips);
+        return true;
+      }
+
+      if (line.indexOf('CLIP_READY|') === 0) {
+        var cp = line.split('|');
+        var idx = parseInt(cp[1], 10);
+        if (!isNaN(idx) && this._onClipReady) {
+          // a path can legitimately contain a pipe, so everything between the
+          // index and the trailing mode belongs to it
+          this._onClipReady(idx, cp.slice(2, cp.length - 1).join('|'), cp[cp.length - 1] || '');
+        }
+        return true;
+      }
+
+      if (line.indexOf('THUMBNAIL_READY|') === 0) {
+        var tIdx = parseInt(line.split('|')[1], 10);
+        if (!isNaN(tIdx) && this._onThumbnail) this._onThumbnail(tIdx);
+        return true;
+      }
+
+      if (line === 'PHASE1_COMPLETE') {
+        if (this._onPhase1) this._onPhase1();
+        return true;
+      }
+
+      if (line.indexOf('REENCODE_PROGRESS|') === 0) {
+        var rp = line.split('|');
+        var doneCount = parseInt(rp[1], 10);
+        var total = parseInt(rp[2], 10);
+        if (!isNaN(doneCount) && !isNaN(total) && this._onReencode) {
+          this._onReencode(doneCount, total);
+        }
+        return true;
+      }
+
+      return false;
     },
 
     _runDetect: function (videoPath, method, cli, extraOpts) {
@@ -65,13 +135,14 @@
         stderrBuf = lines.pop();
         for (var i = 0; i < lines.length; i++) {
           var line = lines[i].trim();
+          if (!line) continue;
           if (line.indexOf('PROGRESS|') === 0) {
             var parts = line.split('|');
             var pct = parseFloat(parts[1]);
             if (isNaN(pct)) pct = 0;
             var msg = parts.length > 2 ? parts.slice(2).join('|') : '';
             if (s._onProgress) s._onProgress(pct, msg, 'detect');
-          } else if (line) {
+          } else if (!s._handleEvent(line)) {
             dbg('debug', 'AmvergeCLI', line);
           }
         }

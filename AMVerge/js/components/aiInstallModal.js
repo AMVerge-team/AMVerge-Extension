@@ -7,8 +7,9 @@
  * Mirrors the desktop app's AI install dialog (`components/AiInstallModal.tsx`)
  * in both wording and structure, and reuses its `pxm-*` / `aid-*` class names so
  * the two look like one product. The difference is what runs underneath: the app
- * provisions a managed venv with uv, while the extension can only pip into
- * whichever interpreter it is pointed at.
+ * provisions a managed venv with uv, while the extension pips into whichever
+ * interpreter it is pointed at, bootstrapping pip first when that interpreter is
+ * the app's uv-made environment, which ships without it.
  *
  * ExtendScript is not involved here. This is all panel-side Node.
  */
@@ -85,36 +86,52 @@
       this._setMessage('Starting install...');
       this._setIndeterminate(true);
 
-      // pip is pointed at the CLI's own ml extra rather than `amverge[ml]`,
-      // because the latter resolves the published wheel from PyPI and would
-      // install over a local editable checkout
-      var args = ['-m', 'pip', 'install', '--upgrade', TARGET_MODULE, 'torch'];
-
-      try {
-        this._proc = window.FileSystem.childProcess.spawn(python, args, { windowsHide: true });
-      } catch (e) {
-        this._fail('Could not start pip: ' + e.message);
-        return;
-      }
-
-      var lastLine = '';
-      var onData = function (buf) {
-        var text = String(buf);
-        var lines = text.split(/\r?\n/);
-        for (var i = 0; i < lines.length; i++) {
-          var line = lines[i].trim();
-          if (line) lastLine = line;
+      this._ensurePip(python, function (ok, detail) {
+        if (!ok) {
+          s._fail('Could not set up pip in ' + python + '. ' + detail);
+          return;
         }
-        // pip has no machine-readable progress, so the latest line is the most
-        // honest thing to show rather than a fabricated percentage
-        if (lastLine) s._setMessage(lastLine);
-      };
+        s._installPack(python);
+      });
+    },
 
-      if (this._proc.stdout) this._proc.stdout.on('data', onData);
-      if (this._proc.stderr) this._proc.stderr.on('data', onData);
+    /** make sure `python` can run pip, bootstrapping it when it cannot.
+     *
+     * The desktop app provisions its AI environment with uv, and a uv venv
+     * ships no pip at all, so pointing pip at the shared environment fails with
+     * "No module named pip" before anything is downloaded. ensurepip is in the
+     * standard library and installs pip into that same venv, which leaves uv's
+     * own view of the environment untouched.
+     */
+    _ensurePip: function (python, callback) {
+      var s = this;
+      this._run(python, ['-m', 'pip', '--version'], null, function (code) {
+        if (code === 0) {
+          callback(true);
+          return;
+        }
+        s._setMessage('Setting up pip...');
+        s._run(python, ['-m', 'ensurepip', '--upgrade'], null, function (code2, lastLine) {
+          callback(code2 === 0, lastLine);
+        });
+      });
+    },
 
-      this._proc.on('close', function (code) {
-        s._proc = null;
+    _installPack: function (python) {
+      var s = this;
+      this._setMessage('Downloading TransNetV2 and PyTorch...');
+
+      // named directly rather than as `amverge[ml]`, because that resolves the
+      // published wheel from PyPI and would install over a local editable
+      // checkout.
+      //
+      // deliberately not --upgrade: the app may already have laid down a CUDA
+      // build of torch from its own index, and upgrading would pull the CPU
+      // wheel from PyPI over the top of it and break the app's GPU detection
+      var args = ['-m', 'pip', 'install', '--disable-pip-version-check',
+                  TARGET_MODULE, 'torch'];
+
+      this._run(python, args, function (line) { s._setMessage(line); }, function (code, lastLine) {
         s._setIndeterminate(false);
         if (code === 0) {
           s._setMessage('Installed. AI Scene Detection is ready.');
@@ -124,10 +141,55 @@
           s._fail('pip exited with code ' + code + '. ' + lastLine);
         }
       });
+    },
 
-      this._proc.on('error', function (err) {
+    /** run `python args`, reporting the last line it printed.
+     *
+     * `onLine` is optional and gets every non-empty line: pip has no
+     * machine-readable progress, so its latest line is the most honest thing to
+     * show rather than a fabricated percentage.
+     */
+    _run: function (python, args, onLine, onClose) {
+      var s = this;
+      var lastLine = '';
+      var proc;
+
+      try {
+        proc = window.FileSystem.childProcess.spawn(python, args, { windowsHide: true });
+      } catch (e) {
+        onClose(-1, 'Could not start ' + python + ': ' + e.message);
+        return;
+      }
+      this._proc = proc;
+
+      var onData = function (buf) {
+        var lines = String(buf).split(/\r?\n/);
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i].trim();
+          if (!line) continue;
+          lastLine = line;
+          if (onLine) onLine(line);
+        }
+      };
+
+      if (proc.stdout) proc.stdout.on('data', onData);
+      if (proc.stderr) proc.stderr.on('data', onData);
+
+      var settled = false;
+      proc.on('close', function (code) {
+        if (settled) return;
+        settled = true;
         s._proc = null;
-        s._fail('pip failed to run: ' + err.message);
+        onClose(code, lastLine);
+      });
+
+      // an 'error' event with no listener throws, and the modal would then sit
+      // on its progress bar with nothing to explain why
+      proc.on('error', function (err) {
+        if (settled) return;
+        settled = true;
+        s._proc = null;
+        onClose(-1, python + ' failed to run: ' + err.message);
       });
     },
 

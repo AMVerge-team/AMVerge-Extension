@@ -98,7 +98,7 @@
     <div class="modal-content" style="max-width:320px;text-align:center">
       <svg class="icon" style="width:36px;height:36px;color:#ef4444;margin:0 auto 10px;display:block"><use href="#icon-warn"/></svg>
       <h2 class="modal-title" style="color:#ef4444">Reset Extension?</h2>
-      <p style="color:var(--text-dim);font-size:11px;line-height:1.4;margin:6px 0 16px;text-align:center">
+      <p class="modal-desc">
         This will clear all extension preferences and rerun the First-Run Setup Wizard.
       </p>
       <div style="display:flex;gap:8px;justify-content:center">
@@ -112,12 +112,38 @@
     <div class="modal-content" style="max-width:320px;text-align:center">
       <svg class="icon" style="width:36px;height:36px;color:#ef4444;margin:0 auto 10px;display:block"><use href="#icon-trash"/></svg>
       <h2 class="modal-title" style="color:#ef4444">Delete History Run?</h2>
-      <p style="color:var(--text-dim);font-size:11px;line-height:1.4;margin:6px 0 16px;text-align:center">
+      <p class="modal-desc">
         This will remove the episode from history and delete its cached clips from disk.
       </p>
       <div style="display:flex;gap:8px;justify-content:center">
         <button class="button" onclick="HistoryPanel.closeDeleteModal()">Cancel</button>
         <button class="button button-danger" onclick="HistoryPanel.confirmDeleteRun()">Confirm Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="cutProgressCard" class="cut-card" style="display:none" role="status" aria-label="Cutting progress">
+    <div class="cut-card-head" id="cutCardHead">
+      <span class="cut-card-spinner" id="cutCardSpinner">|</span>
+      <span class="cut-card-title" id="cutCardTitle">Re-encoding clips</span>
+      <button type="button" class="cut-card-btn" id="cutCardClose"
+              onclick="CutProgressCard.dismiss()" title="Hide" aria-label="Hide">&#10005;</button>
+    </div>
+    <div class="cut-card-progress">
+      <div class="progress-bar cut-card-bar"><div class="progress-fill" id="cutCardFill"></div></div>
+      <span class="cut-card-pct" id="cutCardPct">0%</span>
+    </div>
+    <div class="cut-card-body" id="cutCardBody"></div>
+  </div>
+
+  <div id="clearHistoryConfirmModal" class="modal-overlay" style="display:none">
+    <div class="modal-content" style="max-width:320px;text-align:center">
+      <svg class="icon" style="width:36px;height:36px;color:#ef4444;margin:0 auto 10px;display:block"><use href="#icon-trash"/></svg>
+      <h2 class="modal-title" style="color:#ef4444">Clear All History?</h2>
+      <p id="clearHistoryDesc" class="modal-desc"></p>
+      <div style="display:flex;gap:8px;justify-content:center">
+        <button class="button" onclick="HistoryPanel.closeClearAllModal()">Cancel</button>
+        <button class="button button-danger" onclick="HistoryPanel.confirmClearAll()">Confirm Clear</button>
       </div>
     </div>
   </div>
@@ -234,6 +260,7 @@
   <script src="js/components/previewPanel.js"></script>
   <script src="js/components/settingsPanel.js"></script>
   <script src="js/components/aiInstallModal.js"></script>
+  <script src="js/components/cutProgressCard.js"></script>
   <script src="js/components/toolsSetup.js"></script>
   <script src="js/components/historyPanel.js"></script>
   <script src="js/main.js"></script>
