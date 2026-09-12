@@ -8,16 +8,12 @@
       this.app = app;
     },
 
-    showIdle: function () {
-      this._stopTimer();
-      document.getElementById('importIdle').style.display = '';
-      document.getElementById('importProgress').style.display = 'none';
-    },
-
     showProgress: function () {
       document.getElementById('importIdle').style.display = 'none';
       document.getElementById('importProgress').style.display = '';
-      this._startTime = Date.now();
+      // set after _startTimer, never before: starting the timer clears any
+      // previous run's clock, and setting the start first meant it was wiped
+      // immediately, leaving elapsed at 00:00 and the ETA at --:-- forever
       this._startTimer();
       this.setProgress(0, 'Initializing...');
     },
@@ -31,26 +27,34 @@
 
     _startTimer: function () {
       this._stopTimer();
-      var s = this;
-      var elapsedEl = document.getElementById('importElapsedVal');
-      if (elapsedEl) elapsedEl.textContent = '00:00';
+      this._startTime = Date.now();
 
-      this._timer = setInterval(function () {
-        if (!s._startTime) return;
-        var diffSec = Math.floor((Date.now() - s._startTime) / 1000);
-        var m = Math.floor(diffSec / 60);
-        var sec = diffSec % 60;
-        if (elapsedEl) {
-          elapsedEl.textContent = ('0' + m).slice(-2) + ':' + ('0' + sec).slice(-2);
-        }
-      }, 1000);
+      var s = this;
+      this._renderElapsed();
+      this._timer = setInterval(function () { s._renderElapsed(); }, 1000);
     },
 
+    _renderElapsed: function () {
+      var el = document.getElementById('importElapsedVal');
+      if (!el || !this._startTime) return;
+      var total = Math.floor((Date.now() - this._startTime) / 1000);
+      var m = Math.floor(total / 60);
+      var sec = total % 60;
+      el.textContent = ('0' + m).slice(-2) + ':' + ('0' + sec).slice(-2);
+    },
+
+    /** stops the ticking only. the clock itself is cleared when the panel
+     *  actually leaves the progress state, so a running import keeps its
+     *  elapsed time and ETA */
     _stopTimer: function () {
       if (this._timer) {
         clearInterval(this._timer);
         this._timer = null;
       }
+    },
+
+    _resetClock: function () {
+      this._stopTimer();
       this._startTime = null;
     },
 
@@ -75,7 +79,7 @@
     },
 
     hide: function () {
-      this._stopTimer();
+      this._resetClock();
       document.getElementById('importIdle').style.display = 'none';
       document.getElementById('importProgress').style.display = 'none';
     },
@@ -89,7 +93,7 @@
      * controls, and stays that way until the extension is reloaded.
      */
     showIdle: function () {
-      this._stopTimer();
+      this._resetClock();
       document.getElementById('importProgress').style.display = 'none';
       document.getElementById('importIdle').style.display = '';
     }

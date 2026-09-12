@@ -1,16 +1,8 @@
 /**
- * cutProgressCard.js
+ * cutProgressCard.js - floating progress for work that outlives the grid opening.
  *
- * Floating progress card for work that keeps running after the grid is usable.
- *
- * AI scene detection cuts in two phases: keyframe-aligned scenes are copied
- * losslessly and finish quickly, then the rest are re-encoded, which is much
- * slower. Blocking the whole panel until the second phase ends hid a grid that
- * was already browsable, so the grid opens at PHASE1_COMPLETE and this card
- * carries the remaining work.
- *
- * Mirrors the minimized card of the desktop app's ImportTerminal: draggable,
- * a progress bar, and a scrolling log of clips as they land.
+ * Cutting runs in two phases; the grid opens at PHASE1_COMPLETE and this card
+ * carries the slow re-encode. Mirrors the app's minimized ImportTerminal.
  */
 (function () {
   'use strict';
@@ -26,15 +18,52 @@
     // closing the card means "stop showing me this", so later progress must not
     // bring it back. cleared by reset() when a new run starts
     _dismissed: false,
+    _minimized: false,
 
     init: function () {
       var head = document.getElementById('cutCardHead');
       if (head) head.addEventListener('mousedown', this._startDrag.bind(this));
+
+      var remembered = false;
+      try {
+        remembered = localStorage.getItem('amverge_cutCardMinimized') === '1';
+      } catch (e) {}
+      this.setMinimized(remembered);
     },
 
     /** allow the card to appear again, for a new run */
     reset: function () {
       this._dismissed = false;
+    },
+
+    /** collapse to the header and bar, or expand back to the log.
+     *
+     * Remembered across runs, so someone who does not want the per-clip log
+     * does not have to close it every time cutting starts.
+     */
+    toggleMinimized: function () {
+      this.setMinimized(!this._minimized);
+    },
+
+    setMinimized: function (minimized) {
+      this._minimized = !!minimized;
+
+      var card = document.getElementById('cutProgressCard');
+      if (card) card.classList.toggle('minimized', this._minimized);
+
+      var btn = document.getElementById('cutCardMin');
+      if (btn) {
+        // en dash collapses, square expands, matching the app's terminal card
+        btn.innerHTML = this._minimized ? '&#9634;' : '&#8211;';
+        btn.title = this._minimized ? 'Expand' : 'Minimize';
+        btn.setAttribute('aria-label', btn.title);
+      }
+
+      try {
+        localStorage.setItem('amverge_cutCardMinimized', this._minimized ? '1' : '0');
+      } catch (e) {
+        // a remembered preference is not worth failing a cut over
+      }
     },
 
     /** show the card and start its spinner */

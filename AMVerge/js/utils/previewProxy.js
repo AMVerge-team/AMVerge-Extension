@@ -2,11 +2,13 @@
   // one spawn per chunk, not per clip. windows caps a command line at about
   // 32k characters, and a long episode's paths blow past that
   var MAX_CLIPS_PER_SPAWN = 40;
+  // probing is ffprobe only, so a chunk costs far less than a chunk of
+  // transcodes. bigger chunks mean fewer interpreter startups, which is most of
+  // a probe pass's time
+  var MAX_CLIPS_PER_PROBE = 120;
   var MAX_ARG_CHARS = 24000;
 
-  // how many clips may jump the background queue at once. without a cap, a
-  // grid whose scenes carry no thumbnails asks for every tile at once and
-  // spawns hundreds of processes
+  // capped: a grid with no thumbnails would otherwise spawn hundreds at once
   var MAX_URGENT = 2;
 
   var PROBE_TIMEOUT = 60000;
@@ -15,22 +17,29 @@
 
   /** browser-playable paths for an episode's clips.
    *
-   * Cutting stream-copies the video, so every clip inherits the source codec.
-   * HEVC and 10-bit H.264 both demux and play their audio here while the
-   * picture stays black, because CEP's Chromium decodes neither.
+   * CEP's Chromium decodes neither HEVC nor 10-bit H.264, so those play audio
+   * over a black picture.
    *
-   * Two things make this fast enough to sit behind a click. Clips all share one
-   * codec, so a single probe decides for the whole episode and a playable one
-   * costs nothing at all afterwards. When proxies are needed they are built for
-   * the whole episode in the background, in parallel, from one process, so by
-   * the time anything is clicked the answer is usually already cached.
+   * Playability is per clip, not per episode. Keyframe detection stream-copies
+   * every scene, so its clips do share the source codec, but AI detection mixes
+   * modes: keyframe-aligned scenes are copied and keep the source codec, while
+   * re-encodes and smartcuts come out as 8-bit H.264. One verdict for the whole
+   * episode is therefore wrong for half of an AI run, which is what left some
+   * clips black. Every clip is probed, and only the ones that need it are built.
    */
   var PreviewProxy = {
-    // null until probed, then true when originals cannot be shown as-is
-    _needsProxy: null,
+    // clip -> whether it can be shown as-is. absent until probed
+    _playable: {},
+    // set when no CLI here can answer, in which case originals are all there is
+    _serveOriginals: false,
+    // clips the probe rejected, built in the background in grid order
+    _needBuild: [],
+    _probing: {},
     _cache: {},
     // clip paths belonging to the loaded episode, the only ones worth proxying
     _known: {},
+    // normalised clip path -> the spelling the grid uses
+    _byNormPath: {},
     _waiters: {},
     _urgent: {},
     _wantUrgent: {},
@@ -39,10 +48,8 @@
     _clis: null,
     // the CLI that answered last, tried first from then on
     _cli: null,
-    // CLIs found to lack `preview-proxy`, keyed by command. version skew is
-    // normal: the app's managed venv holds a released wheel, often older than a
-    // developer's checkout, so the CLI preferred for detection is frequently
-    // not one that can build a proxy
+    // CLIs found to lack `preview-proxy`. version skew between the app's venv
+    // and a dev checkout is normal, so the preferred CLI often cannot build one
     _unsupported: {},
     // bumped on every reset, so results from the previous episode are ignored
     // instead of populating a cache that no longer matches the grid
@@ -52,19 +59,21 @@
     reset: function (scenes, app) {
       this.cancel();
       this._episode++;
-      this._needsProxy = null;
+      this._playable = {};
+      this._serveOriginals = false;
+      this._needBuild = [];
+      this._probing = {};
       this._cache = {};
       this._known = {};
       this._waiters = {};
       this._urgent = {};
       this._wantUrgent = {};
+      this._byNormPath = {};
       this._clips = [];
 
       if (!scenes || !scenes.length) return;
 
-      // `collect_scenes` names clips optimistically, so a scene can carry a
-      // path for a file ffmpeg never wrote. those are dropped here rather than
-      // spending a transcode slot on them
+      // `collect_scenes` names clips optimistically, so some files never exist
       var fs = window.FileSystem;
       this._known = {};
       for (var i = 0; i < scenes.length; i++) {
@@ -73,6 +82,7 @@
         if (fs && fs.fileExists && !fs.fileExists(p)) continue;
         this._clips.push(p);
         this._known[p] = true;
+        this._byNormPath[this._norm(p)] = p;
       }
       if (!this._clips.length) return;
 
@@ -80,32 +90,22 @@
       if (!this._clis || !this._clis.length ||
           !window.FileSystem || !window.FileSystem.childProcess) {
         // nothing to build with, so originals are all there is
-        this._needsProxy = false;
+        this._serveOriginals = true;
         return;
       }
 
-      this._probe();
+      this._probeAll();
     },
 
     /** the playable path for a clip if it is already known, else null */
     cached: function (clipPath) {
-      if (this._needsProxy === false) return clipPath;
-      // anything that is not one of this episode's clips is the source video,
-      // which the preview falls back to when a clip never got written. proxying
-      // a whole episode to look at one scene of it is not a trade worth making
+      if (this._serveOriginals) return clipPath;
+      // not a clip means the source video: never worth proxying a whole episode
       if (!this._known[clipPath]) return clipPath;
       return this._cache[clipPath] || null;
     },
 
-    /** call back with a playable path for `clipPath`, immediately when known.
-     *
-     * The callback always runs exactly once. It falls back to the original clip
-     * rather than never firing: a black picture beats a preview that hangs.
-     *
-     * `urgent` is for the clip someone is waiting on, which is the one they
-     * clicked. Everything else rides the background pass, so a mouse crossing
-     * the grid cannot push the opened clip out of the way.
-     */
+    /** playable path for `clipPath`; the callback always runs exactly once, falling back to the original. `urgent` jumps the background queue. */
     request: function (clipPath, callback, urgent) {
       if (!clipPath) {
         callback('');
@@ -119,11 +119,11 @@
 
       if (!this._waiters[clipPath]) this._waiters[clipPath] = [];
       this._waiters[clipPath].push(callback);
-      if (urgent) this._wantUrgent[clipPath] = true;
+      if (!urgent) return;
 
-      // while the probe is still out there is nothing useful to spawn. the
-      // waiter is served the moment it answers
-      if (urgent && this._needsProxy === true) this._buildNow(clipPath);
+      this._wantUrgent[clipPath] = true;
+      if (this._playable[clipPath] === false) this._buildNow(clipPath);
+      else if (this._playable[clipPath] === undefined) this._probeNow(clipPath);
     },
 
     /** stop every running build and release anything waiting on one */
@@ -132,54 +132,113 @@
       this._procs = [];
       this._urgent = {};
       this._wantUrgent = {};
+      this._probing = {};
       this._flushWaiters();
     },
 
-    _probe: function () {
+    /** probe every clip, in grid order, a chunk per spawn.
+     *
+     * `--probe` is one ffprobe per clip and no transcode, so asking about all of
+     * them costs little. Rows stream out as each is read, so a clip becomes
+     * usable without waiting for the rest of the batch.
+     */
+    _probeAll: function () {
       var s = this;
       var ep = this._episode;
-      var target = this._firstExistingClip();
-      if (!target) {
-        this._needsProxy = false;
-        this._flushWaiters();
-        return;
-      }
-
+      var chunks = this._chunk(this._clips, MAX_CLIPS_PER_PROBE);
       var answered = false;
-      this._spawn(['preview-proxy', target, '--probe', '--json'], PROBE_TIMEOUT,
-        function (row) {
-          if (ep !== s._episode || row.playable === undefined) return;
-          answered = true;
-          s._needsProxy = row.playable === false;
 
-          if (!s._needsProxy) {
-            dbg('info', 'Proxy', 'Clips play as-is, no proxies needed');
+      var runChunk = function (i) {
+        if (ep !== s._episode) return;
+        if (i >= chunks.length) {
+          if (!answered) {
+            // no CLI could answer, so assume the originals are fine rather than
+            // leaving every preview waiting on a proxy that will never arrive
+            s._serveOriginals = true;
             s._flushWaiters();
             return;
           }
+          s._startPrewarm();
+          return;
+        }
+        s._spawn(['preview-proxy'].concat(chunks[i], ['--probe', '--json']), PROBE_TIMEOUT,
+          function (row) {
+            if (ep !== s._episode) return;
+            answered = true;
+            s._recordProbe(row);
+          },
+          function () { runChunk(i + 1); });
+      };
 
-          dbg('info', 'Proxy', 'Clips are ' + row.codec + ' (' + row.pixFmt +
-              '), building preview proxies for ' + s._clips.length + ' clips');
-          s._prewarm();
-          // anything clicked during the probe has been waiting on this answer
-          for (var clip in s._wantUrgent) {
-            if (s._wantUrgent.hasOwnProperty(clip)) s._buildNow(clip);
-          }
-        },
+      runChunk(0);
+    },
+
+    /** a click can land before the batch reaches that clip, and one ffprobe is
+     *  cheap enough that it should not wait for the queue */
+    _probeNow: function (clipPath) {
+      if (this._probing[clipPath] || !this._known[clipPath]) return;
+      this._probing[clipPath] = true;
+
+      var s = this;
+      var ep = this._episode;
+      this._spawn(['preview-proxy', clipPath, '--probe', '--json'], PROBE_TIMEOUT,
+        function (row) { if (ep === s._episode) s._recordProbe(row); },
         function () {
-          if (ep !== s._episode || answered) return;
-          // no CLI could answer, so assume the originals are fine rather than
-          // leaving every preview waiting on a proxy that will never arrive
-          s._needsProxy = false;
-          s._flushWaiters();
+          if (ep !== s._episode) return;
+          delete s._probing[clipPath];
+          // no answer, so the original is the only thing left to offer
+          if (s._playable[clipPath] === undefined) s._resolve(clipPath, clipPath);
         });
     },
 
-    /** build every clip's proxy in the background, in grid order */
-    _prewarm: function () {
+    _norm: function (path) {
+      return String(path).replace(/\//g, '\\').toLowerCase();
+    },
+
+    /** the grid's own spelling of a path the CLI echoed back.
+     *
+     * Arguments make the round trip through pathlib, which is free to normalise
+     * separators. A result filed under the CLI's spelling would be one nothing
+     * ever looks up, leaving that clip waiting forever.
+     */
+    _ownKey: function (path) {
+      if (!path || this._known[path]) return path;
+      return this._byNormPath[this._norm(path)] || path;
+    },
+
+    _recordProbe: function (row) {
+      var clip = this._ownKey(row.original);
+      if (!clip) return;
+
+      // an unreadable clip counts as playable, as it does in the CLI, so a
+      // probe failure does not queue a transcode that cannot work either
+      var playable = row.error ? true : row.playable !== false;
+      this._playable[clip] = playable;
+
+      if (playable) {
+        this._resolve(clip, clip);
+        return;
+      }
+      if (this._needBuild.indexOf(clip) === -1) this._needBuild.push(clip);
+      // clicked while the probe was still out, so it has been waiting on this
+      if (this._wantUrgent[clip]) this._buildNow(clip);
+    },
+
+    _startPrewarm: function () {
+      if (!this._needBuild.length) {
+        dbg('info', 'Proxy', 'Clips play as-is, no proxies needed');
+        return;
+      }
+      dbg('info', 'Proxy', 'Building preview proxies for ' + this._needBuild.length +
+          ' of ' + this._clips.length + ' clips');
+      this._prewarm(this._needBuild);
+    },
+
+    /** build proxies for the clips that need one, in the background */
+    _prewarm: function (clips) {
       var s = this;
       var ep = this._episode;
-      var chunks = this._chunk(this._clips);
+      var chunks = this._chunk(clips);
 
       var runChunk = function (i) {
         if (ep !== s._episode) return;
@@ -195,11 +254,7 @@
       runChunk(0);
     },
 
-    /** jump one clip ahead of the background queue.
-     *
-     * Over the cap the request simply waits: the prewarm pass is already
-     * working through the same clips, so it will be served either way.
-     */
+    /** jump one clip ahead of the queue; over the cap it just waits for the prewarm pass */
     _buildNow: function (clipPath) {
       if (this._urgent[clipPath] || this._cache[clipPath]) return;
       if (this._urgentCount() >= MAX_URGENT) return;
@@ -226,7 +281,7 @@
     },
 
     _record: function (row) {
-      var original = row.original;
+      var original = this._ownKey(row.original);
       if (!original) return;
       if (row.error) {
         dbg('warn', 'Proxy', 'preview-proxy: ' + row.error);
@@ -256,11 +311,7 @@
       }
     },
 
-    /** run `preview-proxy` on the first CLI that has the command.
-     *
-     * `onRow` fires per JSON line as results stream in. `onDone` fires once,
-     * after every candidate has been tried or one has finished.
-     */
+    /** run `preview-proxy` on the first CLI that has it. `onRow` per JSON line, `onDone` once. */
     _spawn: function (args, timeoutMs, onRow, onDone) {
       var s = this;
       var candidates = this._candidates();
@@ -285,9 +336,7 @@
         var stderr = '';
         var timer = null;
 
-        // `missing` separates "this CLI cannot do the job" from "this run went
-        // wrong". Only the first is worth remembering: blacklisting a working
-        // CLI over one bad clip would cost every later preview in the session.
+        // only `missing` blacklists the CLI: a bad clip must not cost the session
         var finish = function (ok, missing) {
           if (settled) return;
           settled = true;
@@ -312,9 +361,7 @@
         }
         s._procs.push(proc);
 
-        // an 'error' event with no listener throws, which would take down
-        // whatever click started this. ENOENT just means this candidate is not
-        // installed, so move along to the next one
+        // an unlistened 'error' throws; ENOENT just means try the next candidate
         proc.on('error', function (e) {
           dbg('warn', 'Proxy', 'spawn error (' + cli.command + '): ' + e.message);
           finish(false, true);
@@ -377,12 +424,13 @@
       return out;
     },
 
-    _chunk: function (clips) {
+    _chunk: function (clips, maxClips) {
+      var cap = maxClips || MAX_CLIPS_PER_SPAWN;
       var chunks = [];
       var current = [];
       var chars = 0;
       for (var i = 0; i < clips.length; i++) {
-        if (current.length >= MAX_CLIPS_PER_SPAWN ||
+        if (current.length >= cap ||
             (current.length && chars + clips[i].length > MAX_ARG_CHARS)) {
           chunks.push(current);
           current = [];
@@ -393,14 +441,6 @@
       }
       if (current.length) chunks.push(current);
       return chunks;
-    },
-
-    _firstExistingClip: function () {
-      var fs = window.FileSystem;
-      for (var i = 0; i < this._clips.length; i++) {
-        if (!fs || !fs.fileExists || fs.fileExists(this._clips[i])) return this._clips[i];
-      }
-      return null;
     },
 
     _forget: function (proc) {

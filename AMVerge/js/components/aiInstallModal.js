@@ -1,22 +1,11 @@
 /**
- * aiInstallModal.js
+ * aiInstallModal.js - offers to install TransNetV2 when the pack is missing.
  *
- * Offers to install the TransNetV2 dependency when AI Scene Detection is
- * selected but the pack is missing.
- *
- * Mirrors the desktop app's AI install dialog (`components/AiInstallModal.tsx`)
- * in both wording and structure, and reuses its `pxm-*` / `aid-*` class names so
- * the two look like one product. The difference is what runs underneath: the app
- * provisions a managed venv with uv, while the extension pips into whichever
- * interpreter it is pointed at, bootstrapping pip first when that interpreter is
- * the app's uv-made environment, which ships without it.
- *
- * ExtendScript is not involved here. This is all panel-side Node.
+ * Mirrors the app's AiInstallModal.tsx and reuses its classes, but pips into
+ * whichever interpreter it is pointed at. All panel-side Node, no ExtendScript.
  */
 (function () {
   'use strict';
-
-  var TARGET_MODULE = 'transnetv2_pytorch';
 
   var AiInstallModal = {
     _app: null,
@@ -37,8 +26,27 @@
     open: function () {
       var overlay = document.getElementById('aiInstallModal');
       if (!overlay) return;
+      this._job = null;
       overlay.style.display = '';
       this._setStage('confirm');
+      this._describeTarget();
+    },
+
+    /** same dialog, driven by an explicit runtime job rather than the ml pack */
+    openRuntimeJob: function (config) {
+      var overlay = document.getElementById('aiInstallModal');
+      if (!overlay) return;
+
+      this._job = config;
+      overlay.style.display = '';
+      this._setStage('confirm');
+
+      var title = document.getElementById('aiInstallTitle');
+      if (title) title.textContent = config.title;
+      var lede = document.getElementById('aiInstallLede');
+      if (lede) lede.textContent = config.lede || ('Install ' + config.title + '?');
+      var note = document.querySelector('#aiInstallConfirm .aid-note');
+      if (note) note.textContent = config.note;
       this._describeTarget();
     },
 
@@ -54,24 +62,19 @@
       if (progress) progress.style.display = stage === 'confirm' ? 'none' : '';
     },
 
-    /** says which interpreter the install will land in, since that is the thing
-     *  most likely to surprise someone who already installed it elsewhere */
+    /** which environment this lands in, since that is the thing most likely to
+     *  surprise someone who already installed it elsewhere */
     _describeTarget: function () {
       var target = document.getElementById('aiInstallTarget');
-      if (!target) return;
+      if (!target || !window.AmvergeRuntime) return;
 
-      var python = this._app ? this._app._resolvePython() : 'python';
-      var shared = window.FileSystem && window.FileSystem.getAppAiPython
+      var dir = window.AmvergeRuntime.runtimeDir();
+      var existing = window.FileSystem && window.FileSystem.getAppAiPython
         ? window.FileSystem.getAppAiPython()
         : null;
-
-      if (shared && python === shared) {
-        target.textContent = "the AMVerge desktop app's AI environment (shared)";
-      } else if (this._app && this._app.settings && this._app.settings.pythonPath) {
-        target.textContent = python;
-      } else {
-        target.textContent = python + ' (from PATH)';
-      }
+      target.textContent = existing
+        ? 'the shared AMVerge runtime (' + dir + ')'
+        : 'a new shared AMVerge runtime (' + dir + ')';
     },
 
     install: function () {
@@ -81,115 +84,30 @@
         return;
       }
 
-      var python = this._app ? this._app._resolvePython() : 'python';
       this._setStage('installing');
       this._setMessage('Starting install...');
       this._setIndeterminate(true);
 
-      this._ensurePip(python, function (ok, detail) {
-        if (!ok) {
-          s._fail('Could not set up pip in ' + python + '. ' + detail);
-          return;
-        }
-        s._installPack(python);
-      });
-    },
+      // everything goes through the shared runtime, so an install here is the
+      // same environment the desktop app would build, and either product can
+      // be the one that creates it
+      var job = this._job ? this._job.job : { extras: ['ml'], gpu: true, gpuDecode: false };
+      var onFinished = this._job && this._job.onFinished;
 
-    /** make sure `python` can run pip, bootstrapping it when it cannot.
-     *
-     * The desktop app provisions its AI environment with uv, and a uv venv
-     * ships no pip at all, so pointing pip at the shared environment fails with
-     * "No module named pip" before anything is downloaded. ensurepip is in the
-     * standard library and installs pip into that same venv, which leaves uv's
-     * own view of the environment untouched.
-     */
-    _ensurePip: function (python, callback) {
-      var s = this;
-      this._run(python, ['-m', 'pip', '--version'], null, function (code) {
-        if (code === 0) {
-          callback(true);
-          return;
-        }
-        s._setMessage('Setting up pip...');
-        s._run(python, ['-m', 'ensurepip', '--upgrade'], null, function (code2, lastLine) {
-          callback(code2 === 0, lastLine);
-        });
-      });
-    },
-
-    _installPack: function (python) {
-      var s = this;
-      this._setMessage('Downloading TransNetV2 and PyTorch...');
-
-      // named directly rather than as `amverge[ml]`, because that resolves the
-      // published wheel from PyPI and would install over a local editable
-      // checkout.
-      //
-      // deliberately not --upgrade: the app may already have laid down a CUDA
-      // build of torch from its own index, and upgrading would pull the CPU
-      // wheel from PyPI over the top of it and break the app's GPU detection
-      var args = ['-m', 'pip', 'install', '--disable-pip-version-check',
-                  TARGET_MODULE, 'torch'];
-
-      this._run(python, args, function (line) { s._setMessage(line); }, function (code, lastLine) {
-        s._setIndeterminate(false);
-        if (code === 0) {
-          s._setMessage('Installed. AI Scene Detection is ready.');
+      window.AmvergeRuntime.install(job, {
+        onStage: function (text) { s._setMessage(text); },
+        onLine: function (text) { s._setMessage(text); },
+        onDone: function (ok, detail) {
+          s._setIndeterminate(false);
+          if (!ok) {
+            s._fail(detail || 'The install did not complete.');
+            return;
+          }
+          s._setMessage('Installed.');
           s._setDone();
-          if (window.showToast) window.showToast('TransNetV2 installed', 'success');
-        } else {
-          s._fail('pip exited with code ' + code + '. ' + lastLine);
+          if (window.showToast) window.showToast('AI environment ready', 'success');
+          if (onFinished) onFinished();
         }
-      });
-    },
-
-    /** run `python args`, reporting the last line it printed.
-     *
-     * `onLine` is optional and gets every non-empty line: pip has no
-     * machine-readable progress, so its latest line is the most honest thing to
-     * show rather than a fabricated percentage.
-     */
-    _run: function (python, args, onLine, onClose) {
-      var s = this;
-      var lastLine = '';
-      var proc;
-
-      try {
-        proc = window.FileSystem.childProcess.spawn(python, args, { windowsHide: true });
-      } catch (e) {
-        onClose(-1, 'Could not start ' + python + ': ' + e.message);
-        return;
-      }
-      this._proc = proc;
-
-      var onData = function (buf) {
-        var lines = String(buf).split(/\r?\n/);
-        for (var i = 0; i < lines.length; i++) {
-          var line = lines[i].trim();
-          if (!line) continue;
-          lastLine = line;
-          if (onLine) onLine(line);
-        }
-      };
-
-      if (proc.stdout) proc.stdout.on('data', onData);
-      if (proc.stderr) proc.stderr.on('data', onData);
-
-      var settled = false;
-      proc.on('close', function (code) {
-        if (settled) return;
-        settled = true;
-        s._proc = null;
-        onClose(code, lastLine);
-      });
-
-      // an 'error' event with no listener throws, and the modal would then sit
-      // on its progress bar with nothing to explain why
-      proc.on('error', function (err) {
-        if (settled) return;
-        settled = true;
-        s._proc = null;
-        onClose(-1, python + ' failed to run: ' + err.message);
       });
     },
 

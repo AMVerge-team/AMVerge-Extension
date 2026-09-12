@@ -2,23 +2,17 @@
   <div id="importArea" class="import-area">
     <div id="importIdle" class="import-idle">
       <span class="amverge-wordmark amverge-wordmark-full"><span class="wm-accent">AMV</span>erge</span>
-      
+      <p class="import-tagline">Scene selection made easy.</p>
+
       <div id="aeLayerActionWrap" class="ae-layer-action-wrap" style="display:none">
         <button class="button button-accent button-large button-full" id="detectActiveLayerBtn" onclick="App.startImportFromActiveLayer()">
           <svg class="icon"><use href="#icon-layers"/></svg> Detect Selected Layer (<span id="aeLayerBtnName">Footage</span>)
         </button>
-        <div id="aeLayerInfo" class="ae-layer-info">
-          <svg class="icon"><use href="#icon-video"/></svg>
-          <span id="aeLayerInfoText"></span>
-        </div>
       </div>
 
       <div class="import-buttons">
-        <button class="button button-accent button-large" onclick="App.startImport()">
+        <button class="button button-large button-accent-hover" onclick="App.startImport()">
           <svg class="icon"><use href="#icon-folder"/></svg> Browse File
-        </button>
-        <button class="button button-large" onclick="App.startImportFromProject()">
-          <svg class="icon"><use href="#icon-video"/></svg> Project Bin
         </button>
       </div>
       <div class="import-divider">
@@ -58,10 +52,6 @@
       <div class="left-pane">
         <div class="pane-header">
           <div class="pane-header-left">
-            <button class="pane-action-btn" id="closeEpisodeBtn"
-                    onclick="App.closeEpisode()" title="Close episode">
-              <svg class="icon"><use href="#icon-chevron-left"/></svg>
-            </button>
             <span class="pane-title">Scenes</span>
             <span class="scene-count" id="sceneCount">0</span>
           </div>
@@ -75,9 +65,6 @@
               <button class="pill-action-btn" onclick="ClipsPanel.selectAll()">All</button>
               <button class="pill-action-btn" onclick="ClipsPanel.deselectAll()">None</button>
             </div>
-            <button class="pane-action-btn" id="togglePreviewDrawerBtn" onclick="App.togglePreviewPane()" title="Toggle Preview Panel">
-              <svg class="icon"><use href="#icon-video"/></svg>
-            </button>
           </div>
         </div>
         <div class="clips-container" id="clipsContainer">
@@ -86,18 +73,6 @@
       </div>
       <div class="divider" id="mainDivider"></div>
       <div class="right-pane" id="rightPane">
-        <div class="pane-header">
-          <span class="pane-title">Preview</span>
-          <div class="preview-nav">
-            <button class="preview-nav-btn" id="previewPrevBtn" onclick="PreviewPanel.navigatePrev()" disabled>
-              <svg class="icon"><use href="#icon-chevron-left"/></svg>
-            </button>
-            <span class="preview-nav-label" id="previewNavLabel">-</span>
-            <button class="preview-nav-btn" id="previewNextBtn" onclick="PreviewPanel.navigateNext()" disabled>
-              <svg class="icon"><use href="#icon-chevron-right"/></svg>
-            </button>
-          </div>
-        </div>
         <div class="preview-container" id="previewContainer">
           <div class="preview-window" id="previewWindow">
             <div class="preview-empty" id="previewEmpty">
@@ -141,25 +116,10 @@
               </div>
             </div>
           </div>
-          <div class="scene-info" id="sceneInfo" style="display:none">
-            <div class="scene-info-row">
-              <span class="scene-info-label">Scene</span>
-              <span class="scene-info-value" id="sceneInfoIndex">#0</span>
-            </div>
-            <div class="scene-info-row">
-              <span class="scene-info-label">Duration</span>
-              <span class="scene-info-value" id="sceneInfoDuration">0:00</span>
-            </div>
-            <div class="scene-info-row">
-              <span class="scene-info-label">Time</span>
-              <span class="scene-info-value" id="sceneInfoTime">0:00 - 0:00</span>
-            </div>
-          </div>
           <div class="import-actions">
-            <button class="button button-accent button-full" id="importToAeBtn" onclick="App.importSelectedToAE()" disabled>
+            <button class="button button-full button-accent-hover" id="importToAeBtn" onclick="App.importSelectedToAE()" disabled>
               <svg class="icon"><use href="#icon-import"/></svg> Import Selected to AE
             </button>
-            <div class="selected-info" id="selectedInfo">0 scenes selected</div>
           </div>
         </div>
       </div>

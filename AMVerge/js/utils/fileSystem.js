@@ -178,32 +178,79 @@
       }
     },
 
-    /** Python interpreter from the desktop app's managed AI environment, or null.
+    /** this extension's own folder, for reaching bundled binaries */
+    getExtensionRoot: function () {
+      try {
+        if (window.__adobe_cep_ && window.__adobe_cep_.getSystemPath) {
+          var viaCep = window.__adobe_cep_.getSystemPath('extension');
+          if (viaCep) return viaCep;
+        }
+      } catch (e) {}
+
+      // outside a CEP host (tests, a plain browser) fall back to the page URL,
+      // which is <extension>/index.html
+      try {
+        var href = decodeURI(window.location.href).replace(/^file:\/{2,3}/, '');
+        return this.path.dirname(href.split('?')[0].split('#')[0]);
+      } catch (e) {
+        return '';
+      }
+    },
+
+    /** roots that can hold the shared AMVerge Python runtime, best first.
      *
-     * The app provisions one venv for its AI packs (torch and friends, several
-     * GB) at `<appdata>/app.amverge/pyenv`. Pointing the extension at the same
-     * interpreter means a pack installed in the app is immediately usable here,
-     * instead of the user installing torch a second time into a different
-     * Python that knows nothing about it.
+     * The shared location belongs to neither product, so whichever installed
+     * first provides it. The `app.amverge` entries are where the desktop app
+     * used to keep its own: a venv hardcodes its absolute path, so an existing
+     * one is used where it stands rather than moved.
+     */
+    getRuntimeRoots: function () {
+      var path = this.path;
+      var home = this.getHomeDir();
+      var roots = [];
+
+      var override = process.env.AMVERGE_RUNTIME_DIR;
+      if (override) roots.push(override);
+
+      var local = process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
+      var roaming = process.env.APPDATA || path.join(home, 'AppData', 'Roaming');
+      var appSupport = path.join(home, 'Library', 'Application Support');
+
+      // shared, product-named
+      roots.push(path.join(local, 'AMVerge', 'runtime'));
+      roots.push(path.join(appSupport, 'AMVerge', 'runtime'));
+      roots.push(path.join(home, '.local', 'share', 'AMVerge', 'runtime'));
+
+      // legacy, app-owned
+      roots.push(path.join(roaming, 'app.amverge'));
+      roots.push(path.join(appSupport, 'app.amverge'));
+      roots.push(path.join(home, '.local', 'share', 'app.amverge'));
+
+      return roots;
+    },
+
+    /** Python interpreter from the shared AMVerge runtime, or null.
      *
-     * Returns null when the app has never provisioned it, in which case the
-     * caller falls back to the configured or PATH python.
+     * Using the same interpreter as the app means a pack installed in either
+     * product is immediately usable in the other, instead of torch being
+     * downloaded twice into two Pythons that know nothing about each other.
+     *
+     * Null when no runtime has been provisioned yet, in which case the caller
+     * falls back to the configured or PATH python.
      */
     getAppAiPython: function () {
       try {
         var path = this.path;
-        var roaming = process.env.APPDATA || path.join(this.getHomeDir(), 'AppData', 'Roaming');
-        var candidates = [
-          // windows
-          path.join(roaming, 'app.amverge', 'pyenv', 'Scripts', 'python.exe'),
-          // macos
-          path.join(this.getHomeDir(), 'Library', 'Application Support', 'app.amverge', 'pyenv', 'bin', 'python'),
-          // linux
-          path.join(this.getHomeDir(), '.local', 'share', 'app.amverge', 'pyenv', 'bin', 'python')
-        ];
+        var roots = this.getRuntimeRoots();
 
-        for (var i = 0; i < candidates.length; i++) {
-          if (this.fileExists(candidates[i])) return candidates[i];
+        for (var i = 0; i < roots.length; i++) {
+          var candidates = [
+            path.join(roots[i], 'pyenv', 'Scripts', 'python.exe'),
+            path.join(roots[i], 'pyenv', 'bin', 'python')
+          ];
+          for (var j = 0; j < candidates.length; j++) {
+            if (this.fileExists(candidates[j])) return candidates[j];
+          }
         }
       } catch (e) {
         dbg('warn', 'FileSystem', 'getAppAiPython failed: ' + e);

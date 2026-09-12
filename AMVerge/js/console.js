@@ -141,11 +141,6 @@
       if (!container) return;
       var logs = getFilteredLogs();
 
-      var badge = document.getElementById('consoleCountBadge');
-      if (badge) {
-        badge.textContent = logs.length;
-      }
-
       if (logs.length === 0) {
         container.innerHTML = '<div class="console-empty"><svg class="icon"><use href="#icon-console"/></svg><span>No log entries match criteria</span></div>';
         return;
@@ -156,10 +151,8 @@
       for (var i = start; i < logs.length; i++) {
         var e = logs[i];
         var time = ('0' + e.time.getHours()).slice(-2) + ':' + ('0' + e.time.getMinutes()).slice(-2) + ':' + ('0' + e.time.getSeconds()).slice(-2);
-        var icon = e.level === 'error' ? 'icon-circle-x' : e.level === 'warn' ? 'icon-warn' : e.level === 'success' ? 'icon-circle-check' : e.level === 'debug' ? 'icon-bug' : 'icon-info';
         html += '<div class="console-entry console-' + e.level + '">' +
           '<span class="console-entry-time">' + time + '</span>' +
-          '<span class="console-entry-icon"><svg class="icon"><use href="#' + icon + '"/></svg></span>' +
           '<span class="console-entry-source">' + escHtmlLog(e.source) + '</span>' +
           '<span class="console-entry-msg">' + escHtmlLog(e.message) + '</span>' +
         '</div>';

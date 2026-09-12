@@ -49,12 +49,7 @@
       this._runDetect(videoPath, method, cli, opts);
     },
 
-    /** handle one streaming IPC line, returning true when it was one.
-     *
-     * The CLI emits these on stderr while cutting, so a viewer can show its
-     * grid at PHASE1_COMPLETE and let the slow re-encode phase fill in behind
-     * it. Anything unrecognised falls through to the log.
-     */
+    /** handle one streaming IPC line, returning true when it was one. unknown lines fall through to the log. */
     _handleEvent: function (line) {
       var s = this;
 
@@ -110,9 +105,16 @@
     _runDetect: function (videoPath, method, cli, extraOpts) {
       var s = this;
       var cliMethod = (method === 'transnetv2_gpu' || method === 'transnetv2') ? 'transnetv2' : 'keyframe';
-      var args = cli.prefix.concat([
-        'detect', '--method', cliMethod, '--ipc', '--output', this._outputDir, videoPath
-      ]);
+      var args = cli.prefix.concat(['detect', '--method', cliMethod]);
+
+      // ask for NVDEC and let the CLI settle it: it falls back to FFmpeg on its
+      // own, so enabling GPU decode in the app is all that turns this on
+      var decodeMethod = (extraOpts && extraOpts.decodeMethod) || 'nelux';
+      if (cliMethod === 'transnetv2' && decodeMethod === 'nelux') {
+        args = args.concat(['--decode-method', 'nelux']);
+      }
+
+      args = args.concat(['--ipc', '--output', this._outputDir, videoPath]);
 
       dbg('info', 'Amverge', 'Spawning CLI: ' + cli.command + ' ' + args.join(' '));
 
@@ -143,7 +145,7 @@
             var msg = parts.length > 2 ? parts.slice(2).join('|') : '';
             if (s._onProgress) s._onProgress(pct, msg, 'detect');
           } else if (!s._handleEvent(line)) {
-            dbg('debug', 'AmvergeCLI', line);
+            dbg('debug', 'CLI', line);
           }
         }
       });

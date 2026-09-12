@@ -18,6 +18,7 @@
     },
 
     _currentVideo: null,
+    _currentOutputDir: null,
     _currentScenes: [],
     _importedCount: 0,
     _selectedLayerInfo: null,
@@ -75,6 +76,7 @@
       window.ToolsSetup.init(this);
       window.HistoryPanel.init(this);
       window.CutProgressCard.init();
+      window.CustomSelect.enhanceAll();
 
       var s = this;
       window.ClipsPanel.onSelectionChange(function (count) {
@@ -84,25 +86,7 @@
 
     bindEvents: function () {
       var s = this;
-      var divider = document.getElementById('mainDivider');
-      if (divider) {
-        divider.addEventListener('mousedown', function (e) {
-          e.preventDefault();
-          var startX = e.clientX;
-          var startWidth = document.querySelector('.right-pane').offsetWidth;
-          function onMove(e2) {
-            var delta = startX - e2.clientX;
-            var newWidth = Math.max(180, Math.min(400, startWidth + delta));
-            document.querySelector('.right-pane').style.flex = '0 0 ' + newWidth + 'px';
-          }
-          function onUp() {
-            document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onUp);
-          }
-          document.addEventListener('mousemove', onMove);
-          document.addEventListener('mouseup', onUp);
-        });
-      }
+      this.bindPreviewResizer();
 
       document.addEventListener('mousedown', function (e) {
         var popover = document.getElementById('colorPickerPopover');
@@ -110,6 +94,7 @@
         if (popover && container && popover.style.display !== 'none') {
           if (!container.contains(e.target)) {
             popover.style.display = 'none';
+            s._setPickerOpen(popover, false);
           }
         }
         var about = document.getElementById('aboutModal');
@@ -120,6 +105,99 @@
           }
         }
       });
+    },
+
+    _PREVIEW_MIN: 150,
+    _PREVIEW_MAX: 520,
+    _previewHeight: 260,
+
+    bindPreviewResizer: function () {
+      var s = this;
+      var divider = document.getElementById('mainDivider');
+      var layout = document.getElementById('splitLayout');
+      if (!divider || !layout) return;
+
+      var stored = parseInt(window.StorageManager.getItem('previewHeight', ''), 10);
+      if (!isNaN(stored)) this._previewHeight = stored;
+      var collapsed = window.StorageManager.getItem('previewCollapsed', '0') === '1';
+      this.setPreviewHeight(collapsed ? 0 : this._previewHeight);
+      this.watchPlayerWidth();
+
+      divider.addEventListener('mousedown', function (e) {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        divider.classList.add('dragging');
+
+        var pane = document.getElementById('rightPane');
+        var startY = e.clientY;
+        var startHeight = collapsed ? 0 : pane.offsetHeight;
+
+        function onMove(e2) {
+          s.setPreviewHeight(startHeight + (e2.clientY - startY));
+        }
+        function onUp() {
+          divider.classList.remove('dragging');
+          collapsed = layout.classList.contains('preview-collapsed');
+          document.removeEventListener('mousemove', onMove);
+          document.removeEventListener('mouseup', onUp);
+          window.StorageManager.setItem('previewCollapsed', collapsed ? '1' : '0');
+          if (!collapsed) {
+            window.StorageManager.setItem('previewHeight', String(s._previewHeight));
+          }
+        }
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      });
+
+      // double click toggles, for anyone who would rather not drag
+      divider.addEventListener('dblclick', function () {
+        var isCollapsed = layout.classList.contains('preview-collapsed');
+        s.setPreviewHeight(isCollapsed ? s._previewHeight : 0);
+        collapsed = !isCollapsed;
+        window.StorageManager.setItem('previewCollapsed', collapsed ? '1' : '0');
+      });
+    },
+
+    setPreviewHeight: function (px) {
+      var layout = document.getElementById('splitLayout');
+      if (!layout) return;
+
+      // anything under the minimum snaps shut, so there is no unusable sliver
+      if (px < this._PREVIEW_MIN) {
+        layout.classList.add('preview-collapsed');
+        layout.style.setProperty('--preview-height', '0px');
+        if (window.VideoPlayer) window.VideoPlayer.clear();
+        return;
+      }
+
+      var height = Math.min(this._PREVIEW_MAX, px);
+      this._previewHeight = height;
+      layout.classList.remove('preview-collapsed');
+      layout.style.setProperty('--preview-height', height + 'px');
+      this.syncPlayerWidth();
+    },
+
+    // the player gets its width from 16:9 against the pane height, so matching
+    // it means measuring. drives --player-width for the import button
+    syncPlayerWidth: function () {
+      var win = document.getElementById('previewWindow');
+      var container = document.getElementById('previewContainer');
+      if (!win || !container) return;
+      var width = win.offsetWidth;
+      if (width > 0) container.style.setProperty('--player-width', width + 'px');
+    },
+
+    watchPlayerWidth: function () {
+      var s = this;
+      var win = document.getElementById('previewWindow');
+      if (!win) return;
+      if (typeof ResizeObserver === 'function') {
+        new ResizeObserver(function () { s.syncPlayerWidth(); }).observe(win);
+      } else {
+        window.addEventListener('resize', function () { s.syncPlayerWidth(); });
+      }
+      s.syncPlayerWidth();
     },
 
     bindColorPickerEvents: function () {
@@ -150,6 +228,26 @@
       if (tab === 'history') {
         if (window.HistoryPanel) window.HistoryPanel.render();
       }
+    },
+
+    /** logo: back to the import screen, keeping the episode loaded so the home
+     *  button can return to it. a run in progress owns the screen and is left alone */
+    showImportScreen: function () {
+      this.switchTab('home');
+      if (window.AmvergeHandler && window.AmvergeHandler.isRunning()) return;
+      document.getElementById('scenePanel').style.display = 'none';
+      document.getElementById('importArea').style.display = '';
+      window.ImportPanel.showIdle();
+    },
+
+    /** home button: back to the grid of the last episode, or the import screen if none */
+    goHome: function () {
+      this.switchTab('home');
+      if (window.AmvergeHandler && window.AmvergeHandler.isRunning()) return;
+      if (!this._currentScenes || !this._currentScenes.length) return;
+      document.getElementById('importArea').style.display = 'none';
+      document.getElementById('scenePanel').style.display = '';
+      window.ImportPanel.hide();
     },
 
     showAbout: function () {
@@ -199,12 +297,9 @@
       });
     },
 
-    _previewPaneVisible: true,
-
     updateLayerInfoDisplay: function () {
       var wrap = document.getElementById('aeLayerActionWrap');
       var btnName = document.getElementById('aeLayerBtnName');
-      var text = document.getElementById('aeLayerInfoText');
       var layer = this._selectedLayerInfo;
 
       if (!layer || !layer.ok || !layer.filePath) {
@@ -212,12 +307,13 @@
         return;
       }
 
-      var parts = [];
-      if (layer.width > 0 && layer.height > 0) parts.push(layer.width + 'x' + layer.height);
-      if (layer.frameRate > 0) parts.push(layer.frameRate.toFixed(2) + ' fps');
+      // the resolution/fps pill is gone; the layer name on the button is the
+      // only thing the card needs to say about what is selected
       var name = layer.layerName || layer.name || 'Footage';
       if (btnName) btnName.textContent = name;
-      if (text) text.textContent = (parts.length ? parts.join(' \u00b7 ') : name);
+      // the name is ellipsised on the button, so the whole of it lives on hover
+      var btn = document.getElementById('detectActiveLayerBtn');
+      if (btn) btn.title = 'Detect scenes in ' + name;
       if (wrap) wrap.style.display = 'flex';
     },
 
@@ -230,57 +326,12 @@
       }
     },
 
-    togglePreviewPane: function () {
-      var pane = document.getElementById('rightPane');
-      var divider = document.getElementById('mainDivider');
-      var btn = document.getElementById('togglePreviewDrawerBtn');
-      if (!pane) return;
-
-      this._previewPaneVisible = !this._previewPaneVisible;
-      if (this._previewPaneVisible) {
-        pane.style.display = 'flex';
-        if (divider) divider.style.display = '';
-        if (btn) {
-          btn.classList.add('active');
-          btn.title = 'Hide Preview Panel';
-        }
-      } else {
-        pane.style.display = 'none';
-        if (divider) divider.style.display = 'none';
-        if (btn) {
-          btn.classList.remove('active');
-          btn.title = 'Show Preview Panel';
-        }
-      }
-    },
-
     // --- Import video ---
     startImport: function () {
       var homeDir = window.FileSystem ? window.FileSystem.getHomeDir() : '';
       var videoPath = window.FileSystem ? window.FileSystem.chooseFile('Select video to detect scenes', homeDir) : '';
       if (!videoPath) return;
       this.runDetection(videoPath);
-    },
-
-    startImportFromProject: function () {
-      if (!(window.__adobe_cep__ && window.__adobe_cep__.evalScript)) {
-        window.showToast('AE bridge not available', 'error');
-        return;
-      }
-      var s = this;
-      window.__adobe_cep__.evalScript('getSelectedFootagePath()', function (raw) {
-        var res = {};
-        try { res = JSON.parse(raw || '{}'); } catch (e) {}
-        if (res.ok && res.path) {
-          s.runDetection(res.path);
-        } else {
-          window.showToast(res.message || 'Select a footage item in the Project panel', 'error');
-        }
-      });
-    },
-
-    selectProjectFootage: function (path) {
-      this.runDetection(path);
     },
 
     runDetection: function (videoPath) {
@@ -293,6 +344,8 @@
       if (!outputDir && window.FileSystem && window.FileSystem.path && window.FileSystem.os) {
         outputDir = window.FileSystem.path.join(window.FileSystem.getTempDir(), 'AMVerge', window.FileSystem.getFileNameWithoutExtension(videoPath));
       }
+      // kept so deleting this run from history can close the open episode
+      this._currentOutputDir = outputDir;
 
       window.ImportPanel.showProgress();
       document.getElementById('scenePanel').style.display = 'none';
@@ -305,7 +358,9 @@
       window.AmvergeHandler.detect(videoPath, outputDir, {
         method: this.settings.detectionMethod,
         threshold: this.settings.threshold || 0.5,
-        decodeMethod: this.settings.decodeMethod || 'ffmpeg',
+        // unset by default, which the handler reads as "use NVDEC if the shared
+        // environment has it". set it to 'ffmpeg' to force the software path
+        decodeMethod: this.settings.decodeMethod || '',
         cli: this._resolveCli()
       }, {
         onProgress: function (pct, msg, stage) {
@@ -327,10 +382,8 @@
             sc.path = clipPath;
             break;
           }
-          // before the grid is live these are phase 1 clips, and loadScenes
-          // renders all of them at once. anything arriving after it belongs to
-          // the slow phase, whatever cut mode it ended up using: reencode and
-          // smartcut both land here, so the log follows the phase, not the mode
+          // anything arriving after the grid is live belongs to the slow phase,
+          // whatever cut mode it used, so the log follows the phase not the mode
           if (s._gridLive) {
             window.ClipsPanel.applyClip(idx, clipPath, mode);
             window.CutProgressCard.log('scene ' + (idx + 1) + ' · ' + (mode || 'done'));
@@ -386,9 +439,7 @@
         onError: function (err) {
           window.CutProgressCard.hide();
 
-          // a failure during the re-encode phase leaves a grid full of working
-          // lossless clips. throwing the user back to the import screen would
-          // discard all of it, so the grid stays and only the toast reports
+          // the lossless clips still work, so keep the grid and just report
           if (s._gridLive) {
             window.showToast('Some clips failed to cut: ' + err, 'error');
             dbg('error', 'App', err);
@@ -499,6 +550,7 @@
     closeEpisode: function () {
       this._currentScenes = [];
       this._currentVideo = null;
+      this._currentOutputDir = null;
       this._gridLive = false;
       window.CutProgressCard.hide();
 
@@ -593,6 +645,10 @@
       this.settings.syncThemeWithApp = syncBox ? syncBox.checked : false;
 
       if (this.settings.syncThemeWithApp) {
+        // clearing the hash forces the pull. the watcher skips a theme it has
+        // already seen, so re-enabling after picking a colour by hand would
+        // otherwise match the last sync and quietly do nothing
+        this._lastSyncedThemeHash = null;
         this.syncThemeFromApp(false);
         this.startThemeSyncWatcher();
       } else {
@@ -742,6 +798,7 @@
 
     setAccentColor: function (color) {
       if (!color || color === '#') return;
+      this._stopSyncingTheme();
       this.applyAccentColor(color);
       var hexInput = document.getElementById('hexInput');
       if (hexInput) hexInput.value = color.replace('#', '');
@@ -751,7 +808,30 @@
       }
     },
 
+    /** picking a colour here contradicts "follow the app", so it wins.
+     *
+     * Otherwise the choice survives until the next reload or window focus, when
+     * the watcher pulls the app's theme back over it and the user's selection
+     * disappears with no explanation.
+     */
+    _stopSyncingTheme: function () {
+      if (!this.settings.syncThemeWithApp) return;
+
+      this.settings.syncThemeWithApp = false;
+      if (this._themeSyncTimer) {
+        clearInterval(this._themeSyncTimer);
+        this._themeSyncTimer = null;
+      }
+      var box = document.getElementById('settingsSyncTheme');
+      if (box) box.checked = false;
+      window.StorageManager.saveSettings(this.settings);
+      if (window.showToast) {
+        window.showToast('Theme sync with the app turned off', 'info');
+      }
+    },
+
     setThemePreset: function (accent, gradient) {
+      this._stopSyncingTheme();
       this.applyAccentColor(accent, gradient);
       var hexInput = document.getElementById('hexInput');
       if (hexInput) hexInput.value = accent.replace('#', '');
@@ -829,7 +909,9 @@
 
           if (showToastNotice) window.showToast('Theme synced from AMVerge App', 'success');
         } else if (showToastNotice) {
-          this.setThemePreset('#22c55e', '#001a00');
+          // applyAccentColor, not setThemePreset: the latter treats a colour
+          // change as a manual choice and turns this very sync off
+          this.applyAccentColor('#22c55e', '#001a00');
           window.showToast('Default AMVerge theme applied', 'info');
         }
       } catch (e) {
@@ -839,7 +921,26 @@
 
     toggleColorPicker: function () {
       var popover = document.getElementById('colorPickerPopover');
-      popover.style.display = popover.style.display === 'none' ? '' : 'none';
+      var open = popover.style.display === 'none';
+      popover.style.display = open ? '' : 'none';
+      this._setPickerOpen(popover, open);
+    },
+
+    _setPickerOpen: function (popover, open) {
+      var group = popover.parentNode;
+      while (group && group.classList && !group.classList.contains('settings-group')) {
+        group = group.parentNode;
+      }
+      if (group && group.classList) group.classList.toggle('picker-open', open);
+
+      // the settings page scrolls, so on a short panel the popover opens past
+      // the bottom edge and is clipped
+      if (!open) return;
+      try {
+        popover.scrollIntoView({ block: 'nearest' });
+      } catch (e) {
+        popover.scrollIntoView(false);
+      }
     },
 
     _hexToRgb: function (hex) {
@@ -904,40 +1005,84 @@
     },
 
     // --- Diagnostics ---
+    /* report on the interpreter detection actually uses.*/
     runDoctor: function () {
       var s = this;
       if (!window.FileSystem || !window.FileSystem.childProcess) return;
 
+      var python = this._resolvePython();
+      var run = function (args, timeout) {
+        var res = window.FileSystem.childProcess.spawnSync(python, args, {
+          encoding: 'utf8', timeout: timeout || 10000, windowsHide: true
+        });
+        if (!res || res.error || res.status !== 0) return null;
+        return ((res.stdout || '') + (res.stderr || '')).trim();
+      };
+
       var status = {};
 
-      try {
-        var pyRes = window.FileSystem.childProcess.spawnSync('python', ['--version'], { encoding: 'utf8', timeout: 5000, windowsHide: true });
-        var py = ((pyRes.stdout || '') + (pyRes.stderr || '')).trim();
-        status.python = '✓ ' + (py || '').trim();
-      } catch (e) {
-        status.python = '✗ Not found';
-      }
+      var version = run(['--version'], 5000);
+      status.python = version ? '✓ ' + version : '✗ Not found';
 
-      try {
-        var amv = window.FileSystem.childProcess.execFileSync('python', ['-m', 'pip', 'show', 'amverge'], { encoding: 'utf8', timeout: 10000, windowsHide: true });
-        var lines = (amv || '').split('\n');
-        var ver = '';
-        for (var i = 0; i < lines.length; i++) {
-          if (lines[i].indexOf('Version:') === 0) { ver = lines[i].split(':')[1].trim(); break; }
-        }
-        status.amverge = '✓ v' + (ver || '?');
-      } catch (e) {
-        status.amverge = '✗ Not installed';
-      }
+      // asked of the package itself: `pip show` needs pip, which the app's
+      // uv-made environment does not have
+      var cliVersion = run(['-c', 'import amverge; print(amverge.__version__)']);
+      status.amverge = cliVersion ? '✓ v' + cliVersion : '✗ Not installed';
 
-      try {
-        var gpu = window.FileSystem.childProcess.execFileSync('python', ['-c', 'import torch; print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU")'], { encoding: 'utf8', timeout: 10000, windowsHide: true });
-        status.gpu = (gpu || '').trim();
-      } catch (e) {
-        status.gpu = 'PyTorch not installed';
-      }
+      var torch = run([
+        '-c',
+        'import torch; print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU only")'
+      ], 30000);
+      status.gpu = torch || 'PyTorch not installed';
+
+      // whether NVDEC decode is available here, which is the thing the GPU row
+      // above does not answer on its own
+      var nelux = run([
+        '-c',
+        'from amverge.core.detection.nelux_runtime import nelux_available; print("ready" if nelux_available() else "off")'
+      ], 30000);
+      // remembered so the settings button can offer the opposite action
+      this._gpuDecodeOn = nelux === 'ready';
+      status.gpuDecodeOn = this._gpuDecodeOn;
+      status.gpuDecode = nelux === 'ready'
+        ? '✓ NVDEC enabled'
+        : 'Off';
+
+      status.interpreter = python;
 
       window.SettingsPanel.updateSystemStatus(status);
+    },
+
+    /** install NVDEC decode into the shared runtime.
+     *
+     * Works whether or not the desktop app is installed: both provision the
+     * same environment, so whichever runs first supplies it and the other
+     * simply finds it.
+     */
+    installGpuDecode: function () {
+      var s = this;
+      if (!window.AmvergeRuntime) return;
+
+      // turning it off only removes Nelux, so it is quick and downloads nothing
+      if (this._gpuDecodeOn) {
+        window.AiInstallModal.openRuntimeJob({
+          title: 'GPU decode',
+          lede: 'Turn GPU decode off?',
+          note: 'Removes Nelux. Nothing is downloaded and no other AI feature ' +
+                'is affected; scene detection falls back to FFmpeg decoding.',
+          job: { extras: ['ml'], gpu: true, gpuDecode: false },
+          onFinished: function () { s.runDoctor(); }
+        });
+        return;
+      }
+
+      window.AiInstallModal.openRuntimeJob({
+        title: 'GPU decode',
+        note: 'Decodes video on the GPU for AI scene detection. Needs an NVIDIA ' +
+              'GPU from the RTX 20 series or newer, and downloads PyTorch (~3 GB).',
+        job: { extras: ['ml'], gpu: true, gpuDecode: true },
+        onFinished: function () { s.runDoctor(); }
+      });
     },
 
     // --- Setup wizard bridge ---

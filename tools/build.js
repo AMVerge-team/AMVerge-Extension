@@ -50,7 +50,11 @@ function copyFolderSync(from, to) {
         if (fs.lstatSync(fromPath).isDirectory()) {
             copyFolderSync(fromPath, toPath);
         } else {
-            if (!element.endsWith('.jsxbin') && !element.endsWith('.rar') && !element.endsWith('.zip')) {
+            // .debug opens the CEF remote debugging port for the dev junction.
+            // A signed package is not the place for it.
+            const skip = ['.jsxbin', '.rar', '.zip'].some(ext => element.endsWith(ext)) ||
+                element === '.debug';
+            if (!skip) {
                 fs.copyFileSync(fromPath, toPath);
             }
         }
@@ -199,6 +203,13 @@ async function runBuild() {
                 output: certPath
             });
             console.log(' - Certificate successfully created!');
+        }
+
+        // ZXPSignCmd will not overwrite an existing package, and resolves
+        // without saying so, so every build after the first one reported
+        // success while leaving the previous zxp untouched
+        if (fs.existsSync(zxpOutputPath)) {
+            fs.rmSync(zxpOutputPath);
         }
 
         console.log(' - Packaging to ZXP...');

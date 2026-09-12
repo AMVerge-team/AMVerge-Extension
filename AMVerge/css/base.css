@@ -79,7 +79,8 @@ body {
 
 *:focus { outline: none; }
 :focus-visible { outline: none; }
-input, select, textarea { font-family: var(--font); }
+/* controls read as text, not display type, so they take Arial like descriptions do */
+input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0; }
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -88,15 +89,14 @@ input, select, textarea { font-family: var(--font); }
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(var(--accent-rgb), 0.5);
+  background: rgb(var(--accent-rgb) / 0.5);
 }
 
-::selection { background: rgba(var(--accent-rgb), 0.35); color: #fff; }
+::selection { background: rgb(var(--accent-rgb) / 0.35); color: #fff; }
 
 .icon { width: 15px; height: 15px; flex-shrink: 0; display: block; }
 .sidebar-btn .icon { width: 17px; height: 17px; }
 .button .icon { width: 14px; height: 14px; }
-.preview-nav-btn .icon { width: 12px; height: 12px; }
 .settings-heading .icon { width: 17px; height: 17px; }
 .console-entry-icon .icon { width: 11px; height: 11px; }
 
@@ -165,7 +165,7 @@ input, select, textarea { font-family: var(--font); }
   border-radius: 50%;
   background: var(--accent);
   cursor: pointer;
-  box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.5);
+  box-shadow: 0 0 8px rgb(var(--accent-rgb) / 0.5);
   transition: all var(--transition);
 }
 
@@ -203,12 +203,19 @@ input, select, textarea { font-family: var(--font); }
   align-items: center;
 }
 
+/* the route back to the import screen, so it reads as clickable */
 .sidebar-logo {
   width: 100%;
   padding: 10px 0;
   text-align: center;
   border-bottom: 1px solid var(--border);
   background: rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.sidebar-logo:hover {
+  background: rgba(255, 255, 255, 0.04);
 }
 
 
@@ -254,7 +261,7 @@ input, select, textarea { font-family: var(--font); }
   color: var(--accent);
   background: var(--selector-active-bg);
   border-color: var(--selector-active-border);
-  box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.25);
+  box-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.25);
 }
 
 .sidebar-btn.active::before {
@@ -293,7 +300,7 @@ input, select, textarea { font-family: var(--font); }
   white-space: nowrap;
   pointer-events: none;
   z-index: 1000;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), 0 0 8px rgba(var(--accent-rgb), 0.2);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), 0 0 8px rgb(var(--accent-rgb) / 0.2);
   animation: tooltipFade 0.15s ease-out;
 }
 
@@ -332,15 +339,15 @@ input, select, textarea { font-family: var(--font); }
 
 
 @keyframes logoPulse {
-  0% { transform: scale(1); filter: var(--logo-filter, hue-rotate(0deg)) drop-shadow(0 0 12px rgba(var(--accent-rgb), 0.25)); }
-  100% { transform: scale(1.03); filter: var(--logo-filter, hue-rotate(0deg)) drop-shadow(0 0 22px rgba(var(--accent-rgb), 0.55)); }
+  0% { transform: scale(1); filter: var(--logo-filter, hue-rotate(0deg)) drop-shadow(0 0 12px rgb(var(--accent-rgb) / 0.25)); }
+  100% { transform: scale(1.03); filter: var(--logo-filter, hue-rotate(0deg)) drop-shadow(0 0 22px rgb(var(--accent-rgb) / 0.55)); }
 }
 
 .about-logo-wrap { text-align: center; margin-bottom: var(--space-sm); }
 .about-logo {
   width: 44px;
   height: 44px;
-  filter: var(--logo-filter, hue-rotate(0deg)) drop-shadow(0 0 10px rgba(var(--accent-rgb), 0.45));
+  filter: var(--logo-filter, hue-rotate(0deg)) drop-shadow(0 0 10px rgb(var(--accent-rgb) / 0.45));
   transition: filter var(--transition);
 }
 
@@ -384,8 +391,8 @@ input, select, textarea { font-family: var(--font); }
 .button {
   height: 28px;
   padding: 0 12px;
-  font-family: var(--font);
-  font-size: var(--text-base);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
   font-weight: 400;
   border: 1px solid var(--border-strong);
   background: rgba(15, 0, 0, 0.2);
@@ -422,7 +429,20 @@ input, select, textarea { font-family: var(--font); }
 
 .button-accent {
   border-color: rgb(var(--accent-rgb) / 0.7);
-  background: rgba(var(--accent-rgb), 0.12);
+  background: rgb(var(--accent-rgb) / 0.12);
+  color: var(--accent);
+}
+
+/* neutral at rest like any other button, accent only on hover. for a primary
+   action that should not shout while the card is just sitting there */
+.button-accent-hover:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--selector-active-bg);
+  color: #ffffff;
+  box-shadow: 0 0 16px rgb(var(--accent-rgb) / 0.35);
+}
+
+.button-accent-hover:hover:not(:disabled) .icon {
   color: var(--accent);
 }
 
@@ -430,7 +450,7 @@ input, select, textarea { font-family: var(--font); }
   border-color: var(--accent);
   background: var(--selector-active-bg);
   color: #ffffff;
-  box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.35);
+  box-shadow: 0 0 16px rgb(var(--accent-rgb) / 0.35);
 }
 
 .button-large {
@@ -494,7 +514,7 @@ button,
 /* the "AMV" half carries the accent, the rest stays foreground */
 .amverge-wordmark .wm-accent {
   color: var(--accent);
-  text-shadow: 0 0 12px rgba(var(--accent-rgb), 0.45);
+  text-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.45);
 }
 
 /* full lockup, used on the setup gate and the idle home screen */

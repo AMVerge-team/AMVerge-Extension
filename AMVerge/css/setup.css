@@ -19,7 +19,7 @@
   backdrop-filter: blur(16px);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7), 0 0 24px rgba(var(--accent-rgb), 0.15);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7), 0 0 24px rgb(var(--accent-rgb) / 0.15);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -96,14 +96,14 @@
 }
 
 .setup-mode-card:hover {
-  border-color: rgba(var(--accent-rgb), 0.5);
+  border-color: rgb(var(--accent-rgb) / 0.5);
   background: rgba(255, 255, 255, 0.06);
 }
 
 .setup-mode-card.active {
   border-color: var(--accent);
   background: var(--selector-active-bg);
-  box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.2);
+  box-shadow: 0 0 16px rgb(var(--accent-rgb) / 0.2);
 }
 
 .mode-card-header {

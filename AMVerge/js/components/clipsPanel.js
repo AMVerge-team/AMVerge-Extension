@@ -3,7 +3,8 @@
     _scenes: [],
     _selected: {},
     _focusedIdx: null,
-    _lastClickedIdx: null,
+    // where a shift-range starts from: the last plain click or tick
+    _anchorIdx: null,
     _listeners: [],
 
     init: function (app) {
@@ -25,7 +26,7 @@
       this._scenes = scenes;
       this._selected = {};
       this._focusedIdx = null;
-      this._lastClickedIdx = null;
+      this._anchorIdx = null;
       // every route into an episode lands here, closing one included, so this
       // is where the proxy cache follows what the grid is actually showing
       if (window.PreviewProxy) window.PreviewProxy.reset(scenes, this.app);
@@ -58,13 +59,7 @@
       }
     },
 
-    /** one grid tile, wired up.
-     *
-     * Built one at a time rather than as part of a single render pass, because
-     * clips stream in while cutting runs and a tile has to be replaceable on
-     * its own. Re-rendering the whole grid for each arrival would fight the
-     * user's scroll position and restart every appear animation.
-     */
+    /** one grid tile, built alone so a clip arriving mid-cut can replace it without a full re-render */
     _buildTile: function (s, i) {
       {
         var idx = s.scene_index !== undefined ? s.scene_index : i;
@@ -81,9 +76,7 @@
           wrapper.classList.add('selected');
         }
 
-        // only a real image. `s.path` is the clip's .mp4 for a reopened
-        // episode, and pointing an <img> at that fails to decode, hides itself
-        // via onerror, and leaves a black tile
+        // only a real image: an <img> pointed at a .mp4 just hides itself
         var thumb = s.thumbnail || '';
         var img = document.createElement('img');
         img.className = 'clip-thumb';
@@ -112,9 +105,7 @@
             // a still exists, so the clip is only decoded on hover
             hoverVideo.preload = 'none';
           } else {
-            // no still to show, so the video itself provides the poster: with
-            // metadata preloaded it paints its first frame and stands in for
-            // the thumbnail instead of leaving the tile black
+            // no still, so the video's first frame stands in for the poster
             hoverVideo.preload = 'metadata';
             hoverVideo.style.display = 'block';
             (function (v, p) {
@@ -161,9 +152,7 @@
             if (!vidEl || !clipP) return;
             hovering = true;
             hoverTimer = setTimeout(function () {
-              // an already-built proxy starts instantly. one that is not built
-              // yet leaves the still up until it is, rather than showing the
-              // black picture an undecodable clip would paint
+              // keep the still up until a proxy exists, rather than paint black
               var ready = window.PreviewProxy.cached(clipP);
               if (ready || vidEl.src) startPlaying(ready || clipP);
               else window.PreviewProxy.request(clipP, startPlaying);
@@ -180,17 +169,12 @@
               vidEl.pause();
               // back to the first frame, which is what the tile shows at rest
               try { vidEl.currentTime = 0; } catch (e) {}
-              // only hide it when there is a still underneath to fall back to.
-              // when the video is standing in for a missing thumbnail, hiding
-              // it would leave the tile black
+              // only hide it when a still is underneath to fall back to
               if (thumb) vidEl.style.display = 'none';
             }
           });
 
-          // Same controls as the desktop app: click focuses, double click and
-          // ctrl-click toggle the export checkmark, shift-click takes a range.
-          // Focus and selection are separate ideas here, which is why a plain
-          // click never changes what is ticked.
+          // same controls as the app: click focuses, dblclick/ctrl ticks, shift ranges
           w.addEventListener('click', function (e) {
             // the corner checkbox is a direct toggle wherever it is clicked
             if (e.target === sel || sel.contains(e.target)) {
@@ -200,13 +184,7 @@
             }
 
             if (e.shiftKey) {
-              // anchored on the focused clip, matching the app. replaces the
-              // selection rather than adding to it, so a mis-aimed range is
-              // corrected by shift-clicking again instead of having to clear
-              ClipsPanel._rangeSelect(
-                ClipsPanel._focusedIdx !== null ? ClipsPanel._focusedIdx : idx,
-                idx
-              );
+              ClipsPanel._shiftSelect(idx);
               return;
             }
 
@@ -284,12 +262,7 @@
       img.src = img.getAttribute('src').split('?')[0] + '?t=' + Date.now();
     },
 
-    /** fold the final scene list in without disturbing what the user picked.
-     *
-     * Selection and focus survive on purpose: the grid has been usable since
-     * phase 1, so by the time the last re-encode lands there may well be clips
-     * already ticked for export.
-     */
+    /** fold the final scene list in, keeping selection and focus the user may already have set */
     mergeScenes: function (scenes) {
       var byIdx = {};
       for (var i = 0; i < scenes.length; i++) {
@@ -320,13 +293,11 @@
       if (window.PreviewProxy) window.PreviewProxy.reset(this._scenes, this.app);
     },
 
-    /** focus a clip: outline it and load it into the preview.
-     *
-     * Deliberately separate from selection. Focus is "what am I looking at",
-     * selection is "what gets exported", and the app treats them the same way.
-     */
+    /** focus a clip: what you are looking at, as opposed to what gets exported */
     focusScene: function (idx) {
       this._focusedIdx = parseInt(idx, 10);
+      // a plain click is where the next shift-range starts from
+      this._anchorIdx = this._focusedIdx;
       this._updateFocusUI();
       if (!this.app) {
         dbg('error', 'Clips', 'no app reference, cannot open preview');
@@ -347,8 +318,25 @@
       } else {
         this._selected[idx] = true;
       }
+      // ticking a clip moves the anchor too, as ctrl-clicking does elsewhere
+      this._anchorIdx = idx;
       this._updateSelectionUI();
       this._notify();
+    },
+
+    /** shift-click: range from the anchor to here.
+     *
+     * The anchor outlives the range, so shift-clicking again re-ranges from the
+     * same start. That is what makes a range extendable and shrinkable: before,
+     * the range cleared the anchor, so the second shift-click anchored on itself
+     * and selected that one clip.
+     */
+    _shiftSelect: function (idx) {
+      var anchor = this._anchorIdx;
+      if (anchor === null || anchor === undefined) {
+        anchor = this._focusedIdx !== null ? this._focusedIdx : idx;
+      }
+      this._rangeSelect(anchor, idx);
     },
 
     _rangeSelect: function (fromIdx, toIdx) {
@@ -362,9 +350,10 @@
       var toPos = indices.indexOf(toIdx);
       if (fromPos === -1 || toPos === -1) return;
 
-      // replaces rather than extends, matching the app
+      // the range replaces the selection, but the anchor stays put so the next
+      // shift-click can redraw it from the same end
       this._selected = {};
-      this._focusedIdx = null;
+      this._anchorIdx = fromIdx;
       var start = Math.min(fromPos, toPos);
       var end = Math.max(fromPos, toPos);
       for (var j = start; j <= end; j++) {
@@ -386,6 +375,7 @@
     deselectAll: function () {
       this._selected = {};
       this._focusedIdx = null;
+      this._anchorIdx = null;
       this._updateSelectionUI();
       this._notify();
     },

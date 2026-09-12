@@ -229,38 +229,4 @@ function getProjectFootage() {
   }
 }
 
-// Get selected footage file path from Project panel
-function getSelectedFootagePath() {
-  try {
-    if (!app.project) {
-      return '{"ok":false,"message":"No project open"}';
-    }
-    var footage = null;
-    if (app.project.selection && app.project.selection.length > 0) {
-      for (var j = 0; j < app.project.selection.length; j++) {
-        var itm = app.project.selection[j];
-        if (itm instanceof FootageItem) {
-          footage = itm;
-          break;
-        }
-      }
-    }
-    if (!footage) {
-      return '{"ok":false,"message":"No footage selected in Project panel"}';
-    }
-    var filePath = "";
-    try {
-      if (footage.mainSource && footage.mainSource.file) {
-        filePath = footage.mainSource.file.fsName;
-      }
-    } catch (e) {}
-    if (!filePath) {
-      return '{"ok":false,"message":"Selected footage has no source file"}';
-    }
-    return '{"ok":true,"path":"' + jsonEscape(filePath) + '","name":"' + jsonEscape(footage.name || "") + '"}';
-  } catch (e) {
-    return '{"ok":false,"message":"' + jsonEscape(e.toString()) + '"}';
-  }
-}
-
 $.writeln("AMVerge host.jsx loaded");

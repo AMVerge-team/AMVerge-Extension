@@ -4,7 +4,8 @@
   "description": "Root shortcuts for AMVerge AE Extension tools",
   "private": true,
   "scripts": {
-    "build": "npm run build --prefix tools",
+    "fetch:uv": "node ./tools/fetch-uv.js",
+    "build": "npm run fetch:uv && npm run build --prefix tools",
     "build:2018": "npm run build:2018 --prefix tools",
     "build:2020": "npm run build:2020 --prefix tools",
     "build:2022": "npm run build:2022 --prefix tools",

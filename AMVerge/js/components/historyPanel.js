@@ -186,6 +186,7 @@
 
       if (window.App) {
         window.App._currentScenes = scenes;
+        window.App._currentOutputDir = outputDir;
         window.ClipsPanel.loadScenes(scenes);
         document.getElementById('importArea').style.display = 'none';
         document.getElementById('scenePanel').style.display = '';
@@ -195,11 +196,7 @@
       }
     },
 
-    /** the scene list the CLI leaves beside the clips, or null.
-     *
-     * Much better than scanning: it carries real start/end times and the
-     * thumbnail each clip belongs to, neither of which a filename can say.
-     */
+    /** the CLI's scenes.json, which carries real timings and thumbnails a filename cannot */
     _readScenesJson: function (outputDir) {
       var fs = window.FileSystem;
       var manifest = fs.path.join(outputDir, 'scenes.json');
@@ -236,12 +233,7 @@
       return scenes;
     },
 
-    /** last resort: work the scenes out from what is on disk.
-     *
-     * AI detection writes its clips to `<output>/scenes/` while keyframe
-     * detection writes them straight into `<output>`, so both are checked.
-     * Thumbnails sit in the output root either way, keyed by trailing index.
-     */
+    /** last resort: scan `<output>/scenes/` (AI) then `<output>` (keyframe), thumbnails from the root */
     _scanForScenes: function (outputDir) {
       var fs = window.FileSystem;
 
@@ -310,15 +302,29 @@
       }
       window.StorageManager.saveHistory(this._runs);
       this.render();
+      this._closeIfOpen([outputDir]);
       window.showToast('Run deleted', 'info');
     },
 
-    /** the Clear All button only makes sense when there is something to clear.
-     *
-     * App-synced episodes do not count. They belong to the desktop app, this
-     * panel only mirrors them, and the next sync would bring them straight
-     * back, so a button that appeared to clear them would be lying.
-     */
+    /** the clips of a deleted run are gone from disk, so an open grid pointing at
+     *  them is dead: every tile, preview and import would fail. close it */
+    _closeIfOpen: function (dirs) {
+      var open = window.App && window.App._currentOutputDir;
+      if (!open) return;
+      for (var i = 0; i < dirs.length; i++) {
+        if (dirs[i] && this._samePath(dirs[i], open)) {
+          window.App.closeEpisode();
+          return;
+        }
+      }
+    },
+
+    _samePath: function (a, b) {
+      return String(a).replace(/[\\/]+$/, '').replace(/\\/g, '/').toLowerCase() ===
+             String(b).replace(/[\\/]+$/, '').replace(/\\/g, '/').toLowerCase();
+    },
+
+    /** app-synced episodes do not count: the next sync would bring them straight back */
     _updateClearButton: function () {
       var btn = document.getElementById('historyClearBtn');
       if (!btn) return;
@@ -354,14 +360,14 @@
       var fs = window.FileSystem;
       var runs = this._runs;
       var failed = 0;
+      var dirs = [];
 
       for (var i = 0; i < runs.length; i++) {
         var dir = runs[i].outputDir;
+        dirs.push(dir);
         if (!dir || !fs || !fs.deleteFolderRecursive) continue;
         fs.deleteFolderRecursive(dir);
-        // deleteFolderRecursive reports nothing, so the disk is the only honest
-        // witness. a folder held open by another program survives, and saying
-        // so beats claiming a clean sweep that did not happen
+        // deleteFolderRecursive reports nothing, so check the disk instead
         if (fs.fileExists && fs.fileExists(dir)) {
           failed++;
           dbg('warn', 'History', 'Still on disk after clear: ' + dir);
@@ -372,6 +378,7 @@
       this._runs = [];
       window.StorageManager.saveHistory(this._runs);
       this.render();
+      this._closeIfOpen(dirs);
 
       if (failed) {
         window.showToast('Cleared ' + cleared + ' runs, ' + failed + ' folders left on disk', 'error');

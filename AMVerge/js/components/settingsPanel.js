@@ -23,7 +23,10 @@
     populate: function (settings) {
       document.getElementById('settingsPythonPath').value = settings.pythonPath || '';
       document.getElementById('settingsOutputDir').value = settings.outputDir || '';
-      document.getElementById('settingsDetectionMethod').value = settings.detectionMethod || 'transnetv2_gpu';
+      var detection = document.getElementById('settingsDetectionMethod');
+      detection.value = settings.detectionMethod || 'transnetv2_gpu';
+      // assigning .value fires nothing, so the styled label has to be told
+      if (window.CustomSelect) window.CustomSelect.syncLabel(detection);
       document.getElementById('settingsLayerPrefix').value = settings.layerPrefix || 'AMVerge_';
       document.getElementById('settingsAutoScale').checked = settings.autoScale !== false;
 
@@ -93,16 +96,30 @@
       var amvEl = document.getElementById('sysAmvergeStatus');
       var gpuEl = document.getElementById('sysGpuStatus');
 
+      var decodeEl = document.getElementById('sysGpuDecodeStatus');
+      var envEl = document.getElementById('sysInterpreter');
+
       if (status) {
         if (pyEl) pyEl.textContent = status.python || 'Unknown';
         if (pyEl) pyEl.style.color = status.python && status.python.indexOf('✓') !== -1 ? 'var(--accent)' : '';
         if (amvEl) amvEl.textContent = status.amverge || 'Unknown';
         if (amvEl) amvEl.style.color = status.amverge && status.amverge.indexOf('✓') !== -1 ? 'var(--accent)' : '';
         if (gpuEl) gpuEl.textContent = status.gpu || 'Unknown';
+        if (decodeEl) {
+          decodeEl.textContent = status.gpuDecode || 'Unknown';
+          decodeEl.style.color = status.gpuDecode && status.gpuDecode.indexOf('✓') !== -1 ? 'var(--accent)' : '';
+        }
+        var decodeBtn = document.getElementById('gpuDecodeBtn');
+        if (decodeBtn) decodeBtn.textContent = status.gpuDecodeOn ? 'Disable' : 'Enable';
+        // which Python all of the above describes, since it is not obvious and
+        // is the first thing worth knowing when a row looks wrong
+        if (envEl) envEl.textContent = status.interpreter || '';
       } else {
         if (pyEl) { pyEl.textContent = 'Not checked'; pyEl.style.color = ''; }
         if (amvEl) { amvEl.textContent = 'Not checked'; amvEl.style.color = ''; }
         if (gpuEl) { gpuEl.textContent = 'Not checked'; gpuEl.style.color = ''; }
+        if (decodeEl) { decodeEl.textContent = 'Not checked'; decodeEl.style.color = ''; }
+        if (envEl) envEl.textContent = '';
       }
     }
   };

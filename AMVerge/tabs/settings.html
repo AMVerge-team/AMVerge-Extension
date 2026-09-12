@@ -57,14 +57,11 @@
       </div>
       <div class="settings-row">
         <span class="settings-label">Sync with AMVerge App</span>
-        <div class="settings-control" style="display:flex;align-items:center;gap:8px">
+        <div class="settings-control">
           <label class="custom-checkbox">
             <input type="checkbox" id="settingsSyncTheme" onchange="App.saveSettings()">
             <span class="checkmark"></span>
           </label>
-          <button class="button button-small" onclick="App.syncThemeFromApp(true)" title="Read theme from desktop app storage">
-            <svg class="icon"><use href="#icon-sync"/></svg> Sync Now
-          </button>
         </div>
       </div>
     </div>
@@ -139,6 +136,14 @@
         <span class="settings-label">GPU</span>
         <span class="settings-value" id="sysGpuStatus">Checking...</span>
       </div>
+      <div class="settings-row">
+        <span class="settings-label">GPU decode</span>
+        <div class="settings-control">
+          <span class="settings-value" id="sysGpuDecodeStatus">Checking...</span>
+          <button class="button button-small" id="gpuDecodeBtn" onclick="App.installGpuDecode()">Enable</button>
+        </div>
+      </div>
+      <p class="sys-interpreter" id="sysInterpreter"></p>
       <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
         <button class="button" onclick="App.runDoctor()"><svg class="icon"><use href="#icon-tools"/></svg> Run Diagnostics</button>
         <button class="button button-danger" onclick="App.confirmFactoryReset()"><svg class="icon"><use href="#icon-trash"/></svg> Reset to Setup</button>

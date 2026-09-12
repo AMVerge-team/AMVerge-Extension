@@ -2,6 +2,9 @@
 dist/
 build/
 
+# uv, staged by `npm run fetch:uv` and shipped inside the .zxp
+AMVerge/bin/
+
 # Dependencies
 node_modules/
 

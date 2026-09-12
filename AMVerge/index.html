@@ -60,12 +60,13 @@
     <div class="app-body">
       <nav class="sidebar" id="sidebar">
         <div class="sidebar-top">
-          <div class="sidebar-logo">
+          <div class="sidebar-logo" role="button" tabindex="0" title="New import"
+               onclick="App.showImportScreen()">
             <span class="amverge-wordmark amverge-wordmark-mini"><span class="wm-accent">AMV</span></span>
           </div>
           <div class="sidebar-nav">
-            <button class="sidebar-btn active" data-page="home" data-label="Scenes" onclick="App.switchTab('home')">
-              <svg class="icon"><use href="#icon-home"/></svg>
+            <button class="sidebar-btn active" data-page="home" data-label="Scenes" onclick="App.goHome()">
+              <svg class="icon"><use href="#icon-video"/></svg>
             </button>
             <button class="sidebar-btn" data-page="console" data-label="Console" onclick="App.switchTab('console')">
               <svg class="icon"><use href="#icon-console"/></svg>
@@ -126,6 +127,9 @@
     <div class="cut-card-head" id="cutCardHead">
       <span class="cut-card-spinner" id="cutCardSpinner">|</span>
       <span class="cut-card-title" id="cutCardTitle">Re-encoding clips</span>
+      <button type="button" class="cut-card-btn" id="cutCardMin"
+              onclick="CutProgressCard.toggleMinimized()" title="Minimize"
+              aria-label="Minimize">&#8211;</button>
       <button type="button" class="cut-card-btn" id="cutCardClose"
               onclick="CutProgressCard.dismiss()" title="Hide" aria-label="Hide">&#10005;</button>
     </div>
@@ -203,11 +207,11 @@
   <div id="aiInstallModal" class="pxm-overlay" style="display:none">
     <div class="pxm-modal aid-modal">
       <header class="pxm-header">
-        <span class="pxm-title">AI Scene Detection</span>
+        <span class="pxm-title" id="aiInstallTitle">AI Scene Detection</span>
       </header>
 
       <div id="aiInstallConfirm">
-        <p class="aid-lede">
+        <p class="aid-lede" id="aiInstallLede">
           You don't have <strong>TransNetV2</strong> installed. Would you like to install it now?
         </p>
         <p class="aid-note">
@@ -254,6 +258,8 @@
   <script src="js/utils/fileSystem.js"></script>
   <script src="js/utils/amvergeHandler.js"></script>
   <script src="js/utils/previewProxy.js"></script>
+  <script src="js/utils/customSelect.js"></script>
+  <script src="js/utils/amvergeRuntime.js"></script>
   <script src="js/components/importPanel.js"></script>
   <script src="js/components/clipsPanel.js"></script>
   <script src="js/components/videoPlayer.js"></script>

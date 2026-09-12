@@ -1,9 +1,7 @@
 /* ====================
    BACKGROUND CUT PROGRESS CARD
    ==================== */
-
-/* floats free of any overlay on purpose: the grid behind it stays browsable
-   while the re-encode phase finishes */
+   
 .cut-card {
   position: fixed;
   right: 16px;
@@ -91,6 +89,20 @@
   text-overflow: ellipsis;
 }
 
+/* minimized: header and bar only. narrower too, since without the log there is
+   nothing that needs the width */
+.cut-card.minimized {
+  width: 220px;
+}
+
+.cut-card.minimized .cut-card-body {
+  display: none;
+}
+
+.cut-card.minimized .cut-card-progress {
+  margin-bottom: 2px;
+}
+
 /* ====================
    MODAL SYSTEM
    ==================== */
@@ -122,7 +134,7 @@
   padding: 24px;
   width: 320px;
   max-width: 90vw;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75), 0 0 40px rgba(var(--accent-rgb), 0.12);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75), 0 0 40px rgb(var(--accent-rgb) / 0.12);
   animation: modalSlideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -259,7 +271,7 @@
 .toast.success {
   border-left-color: var(--accent);
   color: var(--text);
-  box-shadow: 0 0 18px rgba(var(--accent-rgb), 0.3);
+  box-shadow: 0 0 18px rgb(var(--accent-rgb) / 0.3);
 }
 .toast.error {
   border-left-color: #ef4444;
@@ -393,7 +405,7 @@
 .modal-close-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
-  box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.3);
+  box-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.3);
 }
 
 .about-header {
@@ -496,7 +508,7 @@
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-lg);
   background: rgba(20, 20, 20, 0.96);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75), 0 0 40px rgba(var(--accent-rgb), 0.12);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75), 0 0 40px rgb(var(--accent-rgb) / 0.12);
 }
 
 .pxm-header {
@@ -599,7 +611,7 @@
 
 .aid-btn-primary {
   border-color: var(--accent);
-  background: rgba(var(--accent-rgb), 0.16);
+  background: rgb(var(--accent-rgb) / 0.16);
   color: var(--accent);
 }
 
