@@ -21,14 +21,20 @@
     },
 
     populate: function (settings) {
-      document.getElementById('settingsPythonPath').value = settings.pythonPath || '';
-      document.getElementById('settingsOutputDir').value = settings.outputDir || '';
+      var pythonPathInput = document.getElementById('settingsPythonPath');
+      if (pythonPathInput) pythonPathInput.value = settings.pythonPath || '';
+      var outputDirInput = document.getElementById('settingsOutputDir');
+      if (outputDirInput) outputDirInput.value = settings.outputDir || '';
       var detection = document.getElementById('settingsDetectionMethod');
-      detection.value = settings.detectionMethod || 'transnetv2_gpu';
-      // assigning .value fires nothing, so the styled label has to be told
-      if (window.CustomSelect) window.CustomSelect.syncLabel(detection);
-      document.getElementById('settingsLayerPrefix').value = settings.layerPrefix || 'AMVerge_';
-      document.getElementById('settingsAutoScale').checked = settings.autoScale !== false;
+      if (detection) {
+        detection.value = settings.detectionMethod || 'transnetv2_gpu';
+        // assigning .value fires nothing, so the styled label has to be told
+        if (window.CustomSelect) window.CustomSelect.syncLabel(detection);
+      }
+      var layerPrefixInput = document.getElementById('settingsLayerPrefix');
+      if (layerPrefixInput) layerPrefixInput.value = settings.layerPrefix || 'AMVerge_';
+      var autoScaleBox = document.getElementById('settingsAutoScale');
+      if (autoScaleBox) autoScaleBox.checked = settings.autoScale !== false;
 
       var syncCheckbox = document.getElementById('settingsSyncTheme');
       if (syncCheckbox) syncCheckbox.checked = settings.syncThemeWithApp === true;

@@ -1213,7 +1213,7 @@
     }, 3000);
   };
 
-  window.addEventListener('DOMContentLoaded', function () {
+  document.addEventListener('DOMContentLoaded', function () {
     window.App = App;
     App.init();
   });
