@@ -55,6 +55,20 @@
         }
       });
 
+      // closing the panel (or AE quitting) tears down this page, but nothing
+      // upstream tells a spawned CLI process to stop: it's the only place
+      // that had a handle on it. Left alone, a detect run or a preview-proxy
+      // batch keeps running orphaned in the background, still contending for
+      // CPU/GPU with AE itself.
+      window.addEventListener('unload', function () {
+        if (window.AmvergeHandler && window.AmvergeHandler.isRunning()) {
+          window.AmvergeHandler.cancel();
+        }
+        if (window.PreviewProxy && window.PreviewProxy.cancel) {
+          window.PreviewProxy.cancel();
+        }
+      });
+
       if (!window.ToolsSetup.isComplete()) {
         window.ToolsSetup.show();
       } else {
