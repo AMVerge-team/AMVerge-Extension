@@ -119,7 +119,11 @@
       dbg('info', 'Amverge', 'Spawning CLI: ' + cli.command + ' ' + args.join(' '));
 
       try {
-        this._proc = window.FileSystem.childProcess.spawn(cli.command, args, { windowsHide: true });
+        // `detached` makes this the leader of its own process group (POSIX
+        // only; Windows ignores it). The CLI shells out to ffmpeg itself, and
+        // that child inherits our group by default, so killing the group in
+        // `cancel()` reaches ffmpeg too instead of orphaning it.
+        this._proc = window.FileSystem.childProcess.spawn(cli.command, args, { windowsHide: true, detached: process.platform !== 'win32' });
       } catch (e) {
         if (this._onError) this._onError('Failed to spawn amverge: ' + e.message);
         return;
@@ -195,7 +199,9 @@
         if (process.platform === 'win32') {
           window.FileSystem.childProcess.execSync('taskkill /F /T /PID ' + this._proc.pid, { windowsHide: true });
         } else {
-          this._proc.kill('SIGTERM');
+          // negative pid signals the whole process group (see spawn above),
+          // so any ffmpeg the CLI shelled out to dies with it
+          process.kill(-this._proc.pid, 'SIGTERM');
         }
       } catch (e) {}
       this._cleanup();

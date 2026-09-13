@@ -351,8 +351,10 @@
         };
 
         try {
+          // `detached` makes this the leader of its own process group so
+          // `_kill` can take out any ffmpeg it shells out to, not just itself
           proc = window.FileSystem.childProcess.spawn(
-            cli.command, cli.prefix.concat(args), { windowsHide: true });
+            cli.command, cli.prefix.concat(args), { windowsHide: true, detached: process.platform !== 'win32' });
         } catch (e) {
           dbg('warn', 'Proxy', 'spawn failed (' + cli.command + '): ' + e.message);
           s._unsupported[cli.command] = true;
@@ -456,7 +458,8 @@
           window.FileSystem.childProcess.execSync(
             'taskkill /F /T /PID ' + proc.pid, { windowsHide: true });
         } else {
-          proc.kill('SIGTERM');
+          // negative pid signals the whole process group (see spawn above)
+          process.kill(-proc.pid, 'SIGTERM');
         }
       } catch (e) {}
     }
