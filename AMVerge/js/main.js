@@ -508,8 +508,15 @@
       // PATH, console script first. spawning a name that is not installed just
       // raises ENOENT, which the caller treats as "try the next one"
       list.push({ command: 'amverge', prefix: [] });
-      list.push({ command: 'python', prefix: ['-m', 'amverge'] });
+      var names = this._pythonNames();
+      for (var i = 0; i < names.length; i++) {
+        list.push({ command: names[i], prefix: ['-m', 'amverge'] });
+      }
       return list;
+    },
+
+    _pythonNames: function () {
+      return process.platform === 'win32' ? ['python', 'python3'] : ['python3', 'python'];
     },
 
     /** the interpreter behind `_resolveCli`, for anything that needs pip */
@@ -519,7 +526,7 @@
         var shared = window.FileSystem.getAppAiPython();
         if (shared) return shared;
       }
-      return 'python';
+      return this._pythonNames()[0];
     },
 
     // --- Scene selection & preview ---
@@ -989,7 +996,11 @@
 
     // --- File dialogs ---
     browsePython: function () {
-      var path = window.FileSystem.chooseFile('Select python.exe', '', 'python.exe|python.exe|All files|*.*');
+      var isWin = process.platform === 'win32';
+      var path = window.FileSystem.chooseFile(
+        isWin ? 'Select python.exe' : 'Select the Python interpreter',
+        '',
+        isWin ? 'python.exe|python.exe|All files|*.*' : 'All files|*.*');
       if (path) {
         document.getElementById('settingsPythonPath').value = path;
         this.saveSettings();
@@ -1031,22 +1042,29 @@
 
       var torch = run([
         '-c',
-        'import torch; print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU only")'
+        'import torch; print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else' +
+        ' ("Apple GPU (MPS)" if torch.backends.mps.is_available() else "CPU only"))'
       ], 30000);
       status.gpu = torch || 'PyTorch not installed';
 
-      // whether NVDEC decode is available here, which is the thing the GPU row
-      // above does not answer on its own
-      var nelux = run([
-        '-c',
-        'from amverge.core.detection.nelux_runtime import nelux_available; print("ready" if nelux_available() else "off")'
-      ], 30000);
-      // remembered so the settings button can offer the opposite action
-      this._gpuDecodeOn = nelux === 'ready';
-      status.gpuDecodeOn = this._gpuDecodeOn;
-      status.gpuDecode = nelux === 'ready'
-        ? '✓ NVDEC enabled'
-        : 'Off';
+      if (process.platform === 'darwin') {
+        this._gpuDecodeOn = false;
+        status.gpuDecodeOn = false;
+        status.gpuDecode = 'Not available on macOS';
+      } else {
+        // whether NVDEC decode is available here, which is the thing the GPU row
+        // above does not answer on its own
+        var nelux = run([
+          '-c',
+          'from amverge.core.detection.nelux_runtime import nelux_available; print("ready" if nelux_available() else "off")'
+        ], 30000);
+        // remembered so the settings button can offer the opposite action
+        this._gpuDecodeOn = nelux === 'ready';
+        status.gpuDecodeOn = this._gpuDecodeOn;
+        status.gpuDecode = nelux === 'ready'
+          ? '✓ NVDEC enabled'
+          : 'Off';
+      }
 
       status.interpreter = python;
 
@@ -1062,6 +1080,11 @@
     installGpuDecode: function () {
       var s = this;
       if (!window.AmvergeRuntime) return;
+
+      if (process.platform === 'darwin') {
+        window.showToast('GPU decode needs an NVIDIA GPU, so it is Windows only', 'error');
+        return;
+      }
 
       // turning it off only removes Nelux, so it is quick and downloads nothing
       if (this._gpuDecodeOn) {

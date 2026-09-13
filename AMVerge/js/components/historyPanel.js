@@ -23,7 +23,7 @@
     syncFromDesktopApp: function () {
       if (!window.FileSystem || !window.FileSystem.path || !window.FileSystem.os) return;
       try {
-        var appData = process.env.APPDATA || window.FileSystem.path.join(window.FileSystem.getHomeDir(), 'AppData', 'Roaming');
+        var appData = window.FileSystem.getAppDataDir();
         var baseDir = window.FileSystem.path.join(appData, 'app.amverge', 'episodes', 'episodes_storage');
 
         if (!window.FileSystem.fileExists(baseDir)) {

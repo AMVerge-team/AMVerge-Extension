@@ -110,7 +110,7 @@
       // ask for NVDEC and let the CLI settle it: it falls back to FFmpeg on its
       // own, so enabling GPU decode in the app is all that turns this on
       var decodeMethod = (extraOpts && extraOpts.decodeMethod) || 'nelux';
-      if (cliMethod === 'transnetv2' && decodeMethod === 'nelux') {
+      if (cliMethod === 'transnetv2' && decodeMethod === 'nelux' && process.platform !== 'darwin') {
         args = args.concat(['--decode-method', 'nelux']);
       }
 

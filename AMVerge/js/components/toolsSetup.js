@@ -2,6 +2,7 @@
   var ToolsSetup = {
     _timers: [],
     _checkState: {},
+    _python: null,
 
     _selectedMode: 'sync',
 
@@ -70,7 +71,7 @@
         { label: 'Python 3.11+', status: 'pending', key: 'python' },
         { label: 'amverge package', status: 'pending', key: 'amverge' },
         { label: 'FFmpeg', status: 'pending', key: 'ffmpeg' },
-        { label: 'GPU (CUDA)', status: 'pending', key: 'gpu' }
+        { label: 'GPU acceleration', status: 'pending', key: 'gpu' }
       ];
 
       var html = '';
@@ -82,40 +83,62 @@
       this._addTimer(function () { s._checkPython(); }, 200);
     },
 
+    _pythonCandidates: function () {
+      var list = [];
+      if (window.App && window.App._resolvePython) list.push(window.App._resolvePython());
+      var names = process.platform === 'win32' ? ['python', 'python3'] : ['python3', 'python'];
+      for (var i = 0; i < names.length; i++) {
+        if (list.indexOf(names[i]) === -1) list.push(names[i]);
+      }
+      return list;
+    },
+
+    _ask: function (python, args, timeout) {
+      try {
+        var res = window.FileSystem.childProcess.spawnSync(python, args, {
+          encoding: 'utf8', timeout: timeout || 10000, windowsHide: true
+        });
+        if (!res || res.error || res.status !== 0) return null;
+        return ((res.stdout || '') + (res.stderr || '')).trim();
+      } catch (e) {
+        return null;
+      }
+    },
+
     _checkPython: function () {
       var s = this;
       if (!window.FileSystem || !window.FileSystem.childProcess) {
         this._markCheck('python', 'fail', 'No Node.js access');
         return;
       }
-      try {
-        var result = window.FileSystem.childProcess.spawnSync('python', ['--version'], { encoding: 'utf8', timeout: 5000, windowsHide: true });
-        var ver = ((result.stdout || '') + (result.stderr || '')).trim();
-        if (ver.indexOf('Python 3.') === 0) {
+
+      var candidates = this._pythonCandidates();
+      for (var i = 0; i < candidates.length; i++) {
+        var ver = this._ask(candidates[i], ['--version'], 5000);
+        if (ver && ver.indexOf('Python 3.') === 0) {
+          this._python = candidates[i];
           s._markCheck('python', 'pass', ver);
           this._addTimer(function () { s._checkAmverge(); }, 100);
-        } else {
-          s._markCheck('python', 'fail', ver + ': need Python 3.11+');
+          return;
         }
-      } catch (e) {
-        s._markCheck('python', 'fail', 'Not found');
       }
+
+      this._python = null;
+      s._markCheck('python', 'fail', 'Python 3.11+ not found');
+      this._addTimer(function () { s._checkFfmpeg(); }, 100);
     },
 
     _checkAmverge: function () {
       var s = this;
-      try {
-        var result = window.FileSystem.childProcess.execFileSync('python', ['-m', 'pip', 'show', 'amverge'], { encoding: 'utf8', timeout: 10000, windowsHide: true });
-        var lines = (result || '').split('\n');
-        var ver = '';
-        for (var i = 0; i < lines.length; i++) {
-          if (lines[i].indexOf('Version:') === 0) { ver = lines[i].trim(); break; }
-        }
-        s._markCheck('amverge', 'pass', ver || 'Installed');
-        this._addTimer(function () { s._checkFfmpeg(); }, 100);
-      } catch (e) {
+      var ver = this._python
+        ? this._ask(this._python, ['-c', 'import amverge; print(amverge.__version__)'])
+        : null;
+      if (ver) {
+        s._markCheck('amverge', 'pass', 'Version: ' + ver);
+      } else {
         s._markCheck('amverge', 'fail', 'Not installed');
       }
+      this._addTimer(function () { s._checkFfmpeg(); }, 100);
     },
 
     _checkFfmpeg: function () {
@@ -132,17 +155,11 @@
 
     _checkGpu: function () {
       var s = this;
-      try {
-        var result = window.FileSystem.childProcess.execFileSync('python', ['-c', 'import torch; print(torch.cuda.is_available())'], { encoding: 'utf8', timeout: 10000, windowsHide: true });
-        var avail = (result || '').trim();
-        if (avail === 'True') {
-          s._markCheck('gpu', 'pass', 'CUDA available');
-        } else {
-          s._markCheck('gpu', 'pass', 'CPU only');
-        }
-      } catch (e) {
-        s._markCheck('gpu', 'pass', 'No PyTorch');
-      }
+      var probe = 'import torch;' +
+        'print("CUDA available" if torch.cuda.is_available() else' +
+        ' ("Apple GPU (MPS)" if torch.backends.mps.is_available() else "CPU only"))';
+      var result = this._python ? this._ask(this._python, ['-c', probe]) : null;
+      s._markCheck('gpu', 'pass', result || 'No PyTorch');
     },
 
     _markCheck: function (key, status, msg) {
@@ -158,12 +175,11 @@
     },
 
     _refreshCheckActions: function () {
-      var pythonOk = this._checkState.python;
       var amvergeOk = this._checkState.amverge;
       var installBtn = document.getElementById('setupInstallBtn');
       var continueBtn = document.getElementById('setupContinueBtn');
-      if (installBtn) installBtn.disabled = !(pythonOk && !amvergeOk);
-      if (continueBtn) continueBtn.disabled = !(pythonOk && amvergeOk);
+      if (installBtn) installBtn.disabled = amvergeOk;
+      if (continueBtn) continueBtn.disabled = !amvergeOk;
     },
 
     installAmverge: function (cb) {
@@ -178,32 +194,36 @@
       }
 
       fill.style.width = '10%';
-      status.textContent = 'Installing amverge package...';
+      status.textContent = 'Preparing the AMVerge runtime...';
 
-      try {
-        var proc = window.FileSystem.childProcess.spawn('python', ['-m', 'pip', 'install', 'amverge[edge]']);
-        var buf = '';
-        proc.stdout.on('data', function (data) { buf += data.toString(); });
-        proc.stderr.on('data', function (data) { buf += data.toString(); });
-        proc.on('close', function (code) {
-          if (code === 0) {
-            fill.style.width = '100%';
-            status.textContent = 'amverge installed successfully';
-            s._addTimer(function () {
-              s._showStep('complete');
-              if (cb) cb(true);
-            }, 300);
-          } else {
-            status.textContent = 'Install failed. Try: pip install amverge';
-            dbg('error', 'Setup', buf);
-          }
-        });
-        proc.on('error', function (err) {
-          status.textContent = 'Error: ' + err.message;
-        });
-      } catch (e) {
-        status.textContent = 'Error: ' + e.message;
+      if (!window.AmvergeRuntime) {
+        status.textContent = 'Error: runtime installer unavailable';
+        return;
       }
+
+      window.AmvergeRuntime.installBase({
+        onStage: function (text) {
+          fill.style.width = '40%';
+          status.textContent = text;
+        },
+        onLine: function (text) {
+          status.textContent = text;
+          dbg('debug', 'Setup', text);
+        },
+        onDone: function (ok, detail) {
+          if (!ok) {
+            status.textContent = 'Install failed: ' + detail;
+            dbg('error', 'Setup', detail);
+            return;
+          }
+          fill.style.width = '100%';
+          status.textContent = 'amverge installed successfully';
+          s._addTimer(function () {
+            s._showStep('complete');
+            if (cb) cb(true);
+          }, 300);
+        }
+      });
     },
 
     skip: function () {

@@ -32,7 +32,10 @@
 
       // inside the .zxp, staged by `npm run fetch:uv`
       var bundled = fs.path.join(fs.getExtensionRoot(), 'bin', 'uv', triple, exe);
-      if (fs.fileExists(bundled)) return bundled;
+      if (fs.fileExists(bundled)) {
+        fs.ensureExecutable(bundled);
+        return bundled;
+      }
 
       // a dev checkout of the app beside this one, so `tauri dev` and the
       // extension share one download
@@ -230,7 +233,7 @@
 
         args = args.concat(TORCH_FAMILY);
         if (wantNelux) args.push(TORCH_PIN_GPU_DECODE);
-        if (opts.gpu) {
+        if (opts.gpu && process.platform !== 'darwin') {
           args.push('--extra-index-url');
           args.push(wantNelux ? TORCH_CUDA_INDEX_GPU_DECODE : TORCH_CUDA_INDEX);
         }
@@ -260,6 +263,54 @@
         }
         installPacks();
       });
+    },
+
+    installBase: function (callbacks) {
+      var s = this;
+      var fs = window.FileSystem;
+      var cb = callbacks || {};
+      var line = cb.onLine || function () {};
+      var stage = cb.onStage || function () {};
+      var done = cb.onDone || function () {};
+
+      if (!fs || !fs.childProcess) {
+        done(false, 'Node child_process is unavailable.');
+        return;
+      }
+
+      var uv = this.uvPath();
+      var runtimeDir = this.runtimeDir();
+      var python = this.pythonIn(runtimeDir);
+      var env = this._uvEnv(runtimeDir);
+
+      fs.createFolder(runtimeDir);
+
+      var installCli = function () {
+        stage('Installing the AMVerge CLI...');
+        s._run(uv, ['pip', 'install', '--python', python, 'amverge[edge]'], env, line,
+          function (code, last) {
+            if (code !== 0) {
+              done(false, last || 'uv exited with code ' + code);
+              return;
+            }
+            done(true, runtimeDir);
+          });
+      };
+
+      if (this.pythonVersionOf(python)) {
+        installCli();
+        return;
+      }
+
+      stage('Preparing the Python environment...');
+      this._run(uv, ['venv', fs.path.join(runtimeDir, 'pyenv'), '--python', PYTHON_VERSION], env, line,
+        function (code, last) {
+          if (code !== 0) {
+            done(false, last || 'Environment setup failed (' + code + ')');
+            return;
+          }
+          installCli();
+        });
     },
 
     _run: function (command, args, env, onLine, onClose) {

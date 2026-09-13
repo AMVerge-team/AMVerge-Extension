@@ -16,6 +16,33 @@
   os = nodeRequire('os');
   childProcess = nodeRequire('child_process');
 
+  var DIALOG_TIMEOUT = 300000;
+
+  function augmentPath() {
+    if (!fs || !path || !os || process.platform === 'win32') return;
+    var home = os.homedir();
+    var extra = [
+      path.join(home, '.local', 'bin'),
+      path.join(home, 'bin'),
+      '/opt/homebrew/bin',
+      '/opt/homebrew/sbin',
+      '/usr/local/bin',
+      '/usr/local/sbin',
+      '/opt/local/bin'
+    ];
+    var current = (process.env.PATH || '').split(':');
+    var added = [];
+    for (var i = 0; i < extra.length; i++) {
+      if (current.indexOf(extra[i]) !== -1) continue;
+      try {
+        if (fs.existsSync(extra[i])) added.push(extra[i]);
+      } catch (e) {}
+    }
+    if (added.length) process.env.PATH = added.concat(current).join(':');
+  }
+
+  augmentPath();
+
   var FileSystem = {
     fs: fs,
     path: path,
@@ -113,11 +140,76 @@
       return os.homedir();
     },
 
-    chooseFile: function (title, startFolder, filter) {
+    _osascript: function (lines) {
       if (!childProcess) return '';
       try {
-        filter = filter || 'Video files|*.mp4;*.mkv;*.mov;*.avi;*.webm|All files|*.*';
-        startFolder = startFolder || '';
+        var result = childProcess.execFileSync('osascript', ['-e', lines.join('\n')], {
+          encoding: 'utf8',
+          timeout: DIALOG_TIMEOUT
+        });
+        return (result || '').trim();
+      } catch (e) {
+        return '';
+      }
+    },
+
+    _asString: function (value) {
+      return '"' + String(value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+    },
+
+    _filterExtensions: function (filter) {
+      var exts = [];
+      var groups = String(filter || '').split('|');
+      for (var i = 1; i < groups.length; i += 2) {
+        var patterns = groups[i].split(';');
+        for (var j = 0; j < patterns.length; j++) {
+          var p = patterns[j].trim().replace(/^\*\./, '');
+          if (!p || p.indexOf('*') !== -1) continue;
+          if (exts.indexOf(p) === -1) exts.push(p.toLowerCase());
+        }
+      }
+      return exts;
+    },
+
+    _chooseFileMac: function (title, startFolder, filter) {
+      var exts = this._filterExtensions(filter);
+      var typeList = '';
+      if (exts.length) {
+        var quoted = [];
+        for (var i = 0; i < exts.length; i++) quoted.push(this._asString(exts[i]));
+        typeList = ' of type {' + quoted.join(', ') + '}';
+      }
+      var location = startFolder && this.fileExists(startFolder)
+        ? ' default location POSIX file ' + this._asString(startFolder)
+        : '';
+      var invisibles = typeList ? '' : ' with invisibles';
+      return this._osascript([
+        'activate',
+        'set chosen to choose file with prompt ' + this._asString(title || 'Select video') +
+          typeList + location + invisibles,
+        'POSIX path of chosen'
+      ]);
+    },
+
+    _chooseFolderMac: function (title, startFolder) {
+      var location = startFolder && this.fileExists(startFolder)
+        ? ' default location POSIX file ' + this._asString(startFolder)
+        : '';
+      return this._osascript([
+        'activate',
+        'set chosen to choose folder with prompt ' + this._asString(title || 'Select folder') + location,
+        'POSIX path of chosen'
+      ]);
+    },
+
+    chooseFile: function (title, startFolder, filter) {
+      if (!childProcess) return '';
+      filter = filter || 'Video files|*.mp4;*.mkv;*.mov;*.avi;*.webm;*.m4v;*.mpg;*.mpeg;*.m2ts;*.mts;*.ts;*.wmv;*.flv;*.mxf|All files|*.*';
+      startFolder = startFolder || '';
+      if (process.platform !== 'win32') {
+        return this._chooseFileMac(title, startFolder, filter);
+      }
+      try {
         var psScript = [
           'Add-Type -AssemblyName System.Windows.Forms',
           '$f = New-Object System.Windows.Forms.OpenFileDialog',
@@ -129,7 +221,7 @@
         ].join('; ');
         var result = childProcess.execFileSync('powershell.exe', ['-STA', '-NoProfile', '-Command', psScript], {
           encoding: 'utf8',
-          timeout: 30000,
+          timeout: DIALOG_TIMEOUT,
           windowsHide: true
         });
         return (result || '').trim();
@@ -140,6 +232,9 @@
 
     chooseFolder: function (title, startFolder) {
       if (!childProcess) return '';
+      if (process.platform !== 'win32') {
+        return this._chooseFolderMac(title, startFolder);
+      }
       try {
         var psScript = [
           'Add-Type -AssemblyName System.Windows.Forms',
@@ -150,7 +245,7 @@
         ].join('; ');
         var result = childProcess.execFileSync('powershell.exe', ['-STA', '-NoProfile', '-Command', psScript], {
           encoding: 'utf8',
-          timeout: 30000,
+          timeout: DIALOG_TIMEOUT,
           windowsHide: true
         });
         return (result || '').trim();
@@ -194,6 +289,28 @@
         return this.path.dirname(href.split('?')[0].split('#')[0]);
       } catch (e) {
         return '';
+      }
+    },
+
+    getAppDataDir: function () {
+      var path = this.path;
+      var home = this.getHomeDir();
+      if (process.platform === 'win32') {
+        return process.env.APPDATA || path.join(home, 'AppData', 'Roaming');
+      }
+      if (process.platform === 'darwin') {
+        return path.join(home, 'Library', 'Application Support');
+      }
+      return process.env.XDG_DATA_HOME || path.join(home, '.local', 'share');
+    },
+
+    ensureExecutable: function (target) {
+      if (!fs || process.platform === 'win32') return;
+      try {
+        var mode = fs.statSync(target).mode;
+        if ((mode & 73) !== 73) fs.chmodSync(target, parseInt('755', 8));
+      } catch (e) {
+        dbg('warn', 'FileSystem', 'Could not mark executable: ' + target);
       }
     },
 
@@ -291,7 +408,7 @@
       if (!fs || !path || !os) return null;
       try {
         var localAppData = process.env.LOCALAPPDATA || path.join(this.getHomeDir(), 'AppData', 'Local');
-        var roamingAppData = process.env.APPDATA || path.join(this.getHomeDir(), 'AppData', 'Roaming');
+        var roamingAppData = this.getAppDataDir();
 
         // Check if there is an explicit theme.json
         var jsonPaths = [
