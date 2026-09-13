@@ -56,7 +56,11 @@
         </div>
       </div>
       <div class="settings-row">
-        <span class="settings-label">Sync with AMVerge App</span>
+        <span class="settings-label">Sync with AMVerge App
+          <span class="info-tip" tabindex="0" data-tip="Mirrors the AMVerge desktop app's accent color and background live, checked every 1.5s and on focus. Picking a color or preset here turns it off. Episode history always syncs from the app, regardless of this setting.">
+            <svg class="icon"><use href="#icon-info"/></svg>
+          </span>
+        </span>
         <div class="settings-control">
           <label class="custom-checkbox">
             <input type="checkbox" id="settingsSyncTheme" onchange="App.saveSettings()">
