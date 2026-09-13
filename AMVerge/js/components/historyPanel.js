@@ -239,8 +239,7 @@
             if (window.App) {
               window.App._currentScenes = scenes;
               window.ClipsPanel.loadScenes(scenes);
-              document.getElementById('importArea').style.display = 'none';
-              document.getElementById('scenePanel').style.display = '';
+              window.App.setSceneView(true);
               window.ImportPanel.hide();
               window.App.switchTab('home');
               window.showToast('Loaded ' + scenes.length + ' scenes from AMVerge App', 'success');
@@ -267,8 +266,7 @@
         window.App._currentScenes = scenes;
         window.App._currentOutputDir = outputDir;
         window.ClipsPanel.loadScenes(scenes);
-        document.getElementById('importArea').style.display = 'none';
-        document.getElementById('scenePanel').style.display = '';
+        window.App.setSceneView(true);
         window.ImportPanel.hide();
         window.App.switchTab('home');
         window.showToast('Loaded ' + scenes.length + ' scenes', 'success');

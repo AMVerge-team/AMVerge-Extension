@@ -232,8 +232,13 @@
       }
       var btns = document.querySelectorAll('.sidebar-btn[data-page]');
       for (var i = 0; i < btns.length; i++) {
+        // "home" is handled by _syncScenesNavActive: it covers both the idle
+        // screen (+ Episode Library) and the scene grid, and this icon means
+        // specifically the grid, not just "Home is the open tab"
+        if (btns[i].dataset.page === 'home') continue;
         btns[i].classList.toggle('active', btns[i].dataset.page === tab);
       }
+      this._syncScenesNavActive();
       if (tab === 'console') {
         if (window.ConsolePanel) window.ConsolePanel.activate();
       } else {
@@ -241,13 +246,32 @@
       }
     },
 
+    /** shows the scene grid or the idle import screen, and keeps the sidebar's
+     *  Scenes icon in sync with whichever one is actually on screen. */
+    setSceneView: function (showScenes) {
+      var scenePanel = document.getElementById('scenePanel');
+      var importArea = document.getElementById('importArea');
+      if (scenePanel) scenePanel.style.display = showScenes ? '' : 'none';
+      if (importArea) importArea.style.display = showScenes ? 'none' : '';
+      this._syncScenesNavActive();
+    },
+
+    _syncScenesNavActive: function () {
+      var btn = document.querySelector('.sidebar-btn[data-page="home"]');
+      if (!btn) return;
+      var homePage = document.getElementById('page-home');
+      var scenePanel = document.getElementById('scenePanel');
+      var showingScenes = !!(homePage && homePage.classList.contains('active') &&
+        scenePanel && scenePanel.style.display !== 'none');
+      btn.classList.toggle('active', showingScenes);
+    },
+
     /** logo: back to the import screen, keeping the episode loaded so the home
      *  button can return to it. a run in progress owns the screen and is left alone */
     showImportScreen: function () {
       this.switchTab('home');
       if (window.AmvergeHandler && window.AmvergeHandler.isRunning()) return;
-      document.getElementById('scenePanel').style.display = 'none';
-      document.getElementById('importArea').style.display = '';
+      this.setSceneView(false);
       window.ImportPanel.showIdle();
     },
 
@@ -256,8 +280,7 @@
       this.switchTab('home');
       if (window.AmvergeHandler && window.AmvergeHandler.isRunning()) return;
       if (!this._currentScenes || !this._currentScenes.length) return;
-      document.getElementById('importArea').style.display = 'none';
-      document.getElementById('scenePanel').style.display = '';
+      this.setSceneView(true);
       window.ImportPanel.hide();
     },
 
@@ -268,9 +291,8 @@
     cancelDetection: function () {
       if (window.AmvergeHandler && window.AmvergeHandler.isRunning()) {
         window.AmvergeHandler.cancel();
-        document.getElementById('importArea').style.display = '';
+        this.setSceneView(false);
         window.ImportPanel.showIdle();
-        document.getElementById('scenePanel').style.display = 'none';
         window.showToast('Detection cancelled', 'info');
       }
     },
@@ -359,7 +381,7 @@
       this._currentOutputDir = outputDir;
 
       window.ImportPanel.showProgress();
-      document.getElementById('scenePanel').style.display = 'none';
+      this.setSceneView(false);
 
       // set once phase 1 hands the grid over, so the completion path knows to
       // merge into a grid the user may already have been picking clips in
@@ -410,8 +432,7 @@
         onPhase1Complete: function () {
           s._gridLive = true;
           window.ClipsPanel.loadScenes(s._currentScenes);
-          document.getElementById('importArea').style.display = 'none';
-          document.getElementById('scenePanel').style.display = '';
+          s.setSceneView(true);
           window.ImportPanel.hide();
         },
 
@@ -439,8 +460,7 @@
               s._currentScenes = scenes;
               window.ClipsPanel.loadScenes(scenes);
             }
-            document.getElementById('importArea').style.display = 'none';
-            document.getElementById('scenePanel').style.display = '';
+            s.setSceneView(true);
             window.ImportPanel.hide();
           }
 
@@ -457,8 +477,7 @@
             return;
           }
 
-          document.getElementById('importArea').style.display = '';
-          document.getElementById('scenePanel').style.display = 'none';
+          s.setSceneView(false);
           // restore the idle controls, not just the container that holds them
           window.ImportPanel.showIdle();
 
@@ -575,8 +594,7 @@
       window.ClipsPanel.loadScenes([]);
       window.PreviewPanel.clearPreview();
 
-      document.getElementById('scenePanel').style.display = 'none';
-      document.getElementById('importArea').style.display = '';
+      this.setSceneView(false);
       window.ImportPanel.showIdle();
     },
 
