@@ -20,7 +20,17 @@
       }, 5000);
     },
 
+    /** pulled from the desktop app's own episode cache. Gated by "Sync with
+     *  AMVerge App": that setting also covers this, not just the theme, since
+     *  both read state that belongs to the app rather than this extension. */
     syncFromDesktopApp: function () {
+      if (!this.app || !this.app.settings || !this.app.settings.syncThemeWithApp) {
+        if (this._appEpisodes.length) {
+          this._appEpisodes = [];
+          this._rerenderIfActive();
+        }
+        return;
+      }
       if (!window.FileSystem || !window.FileSystem.path || !window.FileSystem.os) return;
       try {
         var appData = window.FileSystem.getAppDataDir();
@@ -64,13 +74,16 @@
 
         episodes.sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
         this._appEpisodes = episodes;
-
-        var historyPage = document.getElementById('page-history');
-        if (historyPage && historyPage.classList.contains('active')) {
-          this.render();
-        }
+        this._rerenderIfActive();
       } catch (e) {
         dbg('debug', 'History', 'App sync: ' + e.message);
+      }
+    },
+
+    _rerenderIfActive: function () {
+      var historyPage = document.getElementById('page-history');
+      if (historyPage && historyPage.classList.contains('active')) {
+        this.render();
       }
     },
 

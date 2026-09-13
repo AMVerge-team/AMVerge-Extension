@@ -242,8 +242,8 @@
         window.StorageManager.saveSettings(window.App.settings);
         if (isSync) {
           window.App.syncThemeFromApp(false);
-          if (window.HistoryPanel) window.HistoryPanel.syncFromDesktopApp();
         }
+        if (window.HistoryPanel) window.HistoryPanel.syncFromDesktopApp();
       }
 
       this._clearTimers();

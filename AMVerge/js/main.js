@@ -675,6 +675,7 @@
       } else {
         this.stopThemeSyncWatcher();
       }
+      if (window.HistoryPanel) window.HistoryPanel.syncFromDesktopApp();
 
       this.applyTimestampVisibility(this.settings.showClipTimestamps);
       window.StorageManager.saveSettings(this.settings);
@@ -846,8 +847,9 @@
       var box = document.getElementById('settingsSyncTheme');
       if (box) box.checked = false;
       window.StorageManager.saveSettings(this.settings);
+      if (window.HistoryPanel) window.HistoryPanel.syncFromDesktopApp();
       if (window.showToast) {
-        window.showToast('Theme sync with the app turned off', 'info');
+        window.showToast('Sync with AMVerge App turned off', 'info');
       }
     },
 
