@@ -304,6 +304,31 @@
       return process.env.XDG_DATA_HOME || path.join(home, '.local', 'share');
     },
 
+    /** open the OS file manager with a file or folder pre-selected */
+    revealInFileManager: function (targetPath) {
+      if (!childProcess || !targetPath) return;
+      try {
+        var proc;
+        if (process.platform === 'win32') {
+          proc = childProcess.spawn('explorer.exe', ['/select,' + targetPath], { detached: true, stdio: 'ignore' });
+        } else if (process.platform === 'darwin') {
+          proc = childProcess.spawn('open', ['-R', targetPath], { detached: true, stdio: 'ignore' });
+        } else {
+          var dir = this.fileExists(targetPath) && fs.statSync(targetPath).isDirectory()
+            ? targetPath
+            : this.path.dirname(targetPath);
+          proc = childProcess.spawn('xdg-open', [dir], { detached: true, stdio: 'ignore' });
+        }
+        // explorer.exe in particular exits non-zero on a plain /select, with no
+        // fault of its own; an unlistened 'error' would still throw on a
+        // genuinely missing binary, so give it an empty handler either way
+        proc.on('error', function () {});
+        proc.unref();
+      } catch (e) {
+        dbg('warn', 'FileSystem', 'revealInFileManager failed: ' + e.message);
+      }
+    },
+
     /** where the persistent extension log lives, independent of any single
      * CEP session. CEP overwrites its own CEPHtmlEngine*.log on every
      * relaunch, so a hang right before a force-quit leaves nothing behind -

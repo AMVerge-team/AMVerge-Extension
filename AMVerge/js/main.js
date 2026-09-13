@@ -225,7 +225,7 @@
 
     // --- Tab switching ---
     switchTab: function (tab) {
-      var pages = ['home', 'console', 'settings', 'history'];
+      var pages = ['home', 'console', 'settings'];
       for (var i = 0; i < pages.length; i++) {
         var el = document.getElementById('page-' + pages[i]);
         if (el) el.classList.toggle('active', pages[i] === tab);
@@ -238,9 +238,6 @@
         if (window.ConsolePanel) window.ConsolePanel.activate();
       } else {
         if (window.ConsolePanel) window.ConsolePanel.deactivate();
-      }
-      if (tab === 'history') {
-        if (window.HistoryPanel) window.HistoryPanel.render();
       }
     },
 

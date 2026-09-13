@@ -3,12 +3,15 @@
     _runs: [],
     _appEpisodes: [],
     _syncTimer: null,
+    _search: '',
+    _sortDir: null,
 
     init: function (app) {
       this.app = app;
       this._runs = window.StorageManager.loadHistory();
       this.syncFromDesktopApp();
       this.startAutoSync();
+      this.render();
     },
 
     startAutoSync: function () {
@@ -27,7 +30,7 @@
       if (!this.app || !this.app.settings || !this.app.settings.syncThemeWithApp) {
         if (this._appEpisodes.length) {
           this._appEpisodes = [];
-          this._rerenderIfActive();
+          this.render();
         }
         return;
       }
@@ -74,17 +77,36 @@
 
         episodes.sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
         this._appEpisodes = episodes;
-        this._rerenderIfActive();
+        this.render();
       } catch (e) {
         dbg('debug', 'History', 'App sync: ' + e.message);
       }
     },
 
-    _rerenderIfActive: function () {
-      var historyPage = document.getElementById('page-history');
-      if (historyPage && historyPage.classList.contains('active')) {
-        this.render();
+    setSearch: function (value) {
+      this._search = String(value || '');
+      var clearBtn = document.getElementById('epLibSearchClear');
+      if (clearBtn) clearBtn.style.display = this._search ? '' : 'none';
+      this.render();
+    },
+
+    clearSearch: function () {
+      var input = document.getElementById('epLibSearchInput');
+      if (input) input.value = '';
+      this.setSearch('');
+    },
+
+    /** alphabetical by video name, toggling asc/desc/off. off falls back to
+     *  the natural order: app episodes first (newest first), then extension
+     *  runs (also newest first) */
+    toggleSort: function () {
+      this._sortDir = this._sortDir === 'asc' ? 'desc' : 'asc';
+      var btn = document.getElementById('epLibSortBtn');
+      if (btn) {
+        btn.classList.add('active');
+        btn.title = this._sortDir === 'asc' ? 'Sorted A-Z (click for Z-A)' : 'Sorted Z-A (click for A-Z)';
       }
+      this.render();
     },
 
     addRun: function (videoPath, outputDir, sceneCount, method) {
@@ -111,45 +133,89 @@
 
       this._updateClearButton();
 
+      var countEl = document.getElementById('epLibCount');
+      if (countEl) countEl.textContent = allItems.length;
+
+      var query = this._search.trim().toLowerCase();
+      var items = query
+        ? allItems.filter(function (item) {
+            var name = item.videoPath.split('\\').pop().split('/').pop() || item.videoPath;
+            return name.toLowerCase().indexOf(query) !== -1;
+          })
+        : allItems;
+
+      if (this._sortDir) {
+        var dir = this._sortDir === 'asc' ? 1 : -1;
+        items = items.slice().sort(function (a, b) {
+          var an = (a.videoPath.split('\\').pop().split('/').pop() || a.videoPath).toLowerCase();
+          var bn = (b.videoPath.split('\\').pop().split('/').pop() || b.videoPath).toLowerCase();
+          return an < bn ? -1 * dir : an > bn ? 1 * dir : 0;
+        });
+      }
+
       if (allItems.length === 0) {
-        container.innerHTML = '<div class="history-empty">' +
-          '<svg class="icon history-empty-icon"><use href="#icon-history"/></svg>' +
-          '<h3 class="history-empty-title">No History Found</h3>' +
-          '<p class="history-empty-desc">Imported episodes and scene detection runs will show up here for instant re-opening.</p>' +
+        container.innerHTML = '<div class="ep-lib-empty">' +
+          '<svg class="icon ep-lib-empty-icon"><use href="#icon-video"/></svg>' +
+          '<p class="ep-lib-empty-title">No episodes yet</p>' +
+          '<p class="ep-lib-empty-desc">Imported episodes and scene detection runs show up here for instant re-opening.</p>' +
+        '</div>';
+        return;
+      }
+
+      if (items.length === 0) {
+        container.innerHTML = '<div class="ep-lib-empty">' +
+          '<svg class="icon ep-lib-empty-icon"><use href="#icon-search"/></svg>' +
+          '<p class="ep-lib-empty-title">No matches</p>' +
         '</div>';
         return;
       }
 
       var html = '';
-      for (var i = 0; i < allItems.length; i++) {
-        var item = allItems[i];
+      for (var i = 0; i < items.length; i++) {
+        var item = items[i];
         var date = new Date(item.date);
         var dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         var videoName = item.videoPath.split('\\').pop().split('/').pop() || item.videoPath;
         var methodLabel = item.method === 'keyframe_detection' || item.method === 'keyframe' ? 'Keyframe' : 'AI TransNetV2';
+        var manifestArg = item.manifestPath ? this._jsArg(item.manifestPath) : '';
+        var outputArg = this._jsArg(item.outputDir);
 
-        html += '<div class="history-item' + (item.isAppEpisode ? ' app-synced' : '') + '" data-id="' + item.id + '">';
-        html += '<div class="history-item-main">';
-        html += '<div class="history-item-name">';
+        html += '<div class="ep-lib-row" data-id="' + item.id + '" onclick="HistoryPanel.loadItem(\'' + manifestArg + '\', \'' + outputArg + '\')">';
+        html += '<svg class="icon ep-lib-media-icon"><use href="#icon-video"/></svg>';
+        html += '<div class="ep-lib-main">';
+        html += '<div class="ep-lib-name" title="' + this._escHtml(item.videoPath) + '">' + this._escHtml(videoName) + '</div>';
+        html += '<div class="ep-lib-meta-row">';
         if (item.isAppEpisode) {
-          html += '<span class="badge badge-accent" style="font-size:9px;margin-right:6px;padding:1px 5px">AMVerge App</span>';
+          html += '<span class="ep-lib-app-badge">AMVerge App</span>';
         }
-        html += this._escHtml(videoName) + '</div>';
-        html += '<div class="history-item-meta">';
-        html += '<span>' + item.sceneCount + ' scenes</span>';
         html += '<span class="method-badge ' + item.method + '">' + methodLabel + '</span>';
-        html += '<span>' + dateStr + '</span>';
+        html += '<span class="ep-lib-meta-text">' + item.sceneCount + ' scenes &middot; ' + dateStr + '</span>';
         html += '</div>';
         html += '</div>';
-        html += '<div class="history-item-actions">';
-        html += '<button class="button button-small button-accent" onclick="HistoryPanel.loadItem(\'' + (item.manifestPath ? item.manifestPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'") : '') + '\', \'' + item.outputDir.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\')" title="Open in AE Extension"><svg class="icon"><use href="#icon-folder"/></svg> Open</button>';
+        html += '<div class="ep-lib-row-actions">';
+        html += '<button type="button" class="ep-lib-icon-btn" title="Show in file manager" ' +
+          'onclick="event.stopPropagation();HistoryPanel.revealItem(\'' + outputArg + '\')">' +
+          '<svg class="icon"><use href="#icon-folder"/></svg></button>';
         if (!item.isAppEpisode) {
-          html += '<button class="button button-small button-danger" onclick="HistoryPanel.promptDeleteRun(\'' + item.id + '\', \'' + item.outputDir.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + '\')" title="Delete"><svg class="icon"><use href="#icon-trash"/></svg></button>';
+          html += '<button type="button" class="ep-lib-icon-btn danger" title="Delete" ' +
+            'onclick="event.stopPropagation();HistoryPanel.promptDeleteRun(\'' + item.id + '\', \'' + outputArg + '\')">' +
+            '<svg class="icon"><use href="#icon-trash"/></svg></button>';
         }
         html += '</div>';
         html += '</div>';
       }
       container.innerHTML = html;
+    },
+
+    /** a path or id dropped into a single-quoted onclick="" attribute */
+    _jsArg: function (value) {
+      return String(value || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    },
+
+    revealItem: function (outputDir) {
+      if (window.FileSystem && window.FileSystem.revealInFileManager) {
+        window.FileSystem.revealInFileManager(outputDir);
+      }
     },
 
     loadItem: function (manifestPath, outputDir) {

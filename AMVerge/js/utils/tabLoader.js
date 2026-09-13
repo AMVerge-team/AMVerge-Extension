@@ -1,5 +1,5 @@
 (function () {
-  var TABS = ["home", "console", "settings", "history", "setup"];
+  var TABS = ["home", "console", "settings", "setup"];
   var html = {};
   for (var i = 0; i < TABS.length; i++) {
     try {

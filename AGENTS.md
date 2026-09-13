@@ -61,16 +61,15 @@ Root `package.json` proxies to `tools/`. Commands: `build`, `build:2018|2020|202
 ├── CSXS/manifest.xml
 ├── index.html                  # SPA: topbar nav + dynamic tabLoader placeholders
 ├── tabs/
-│   ├── home.html               # Home tab: import & scene grid preview
+│   ├── home.html               # Home tab: import idle (+ Episode Library) & scene grid preview
 │   ├── console.html            # Console debug log tab
 │   ├── settings.html           # Settings & appearance tab
-│   ├── history.html            # Episodes history & desktop sync tab
 │   └── setup.html              # First-run setup wizard overlay
 ├── css/
 │   ├── base.css                # Tokens, reset, body, scrollbar, app shell, sidebar, buttons
 │   ├── home.css                # Import idle, progress, split layout, clips grid, preview panel
 │   ├── settings.css            # Settings page, custom checkboxes, color picker
-│   ├── history.css             # Episode history items and list
+│   ├── episodeLibrary.css      # Episode Library list on Home (desktop app's Episode Panel look)
 │   ├── console.css             # Debug console toolbar and log entries
 │   ├── setup.css               # Setup wizard overlay and step cards
 │   └── common.css              # Modals, toasts, skeleton shimmer animations
@@ -85,12 +84,12 @@ Root `package.json` proxies to `tools/`. Commands: `build`, `build:2018|2020|202
 │   │   ├── videoPlayer.js      # Preview playback surface
 │   │   ├── cutProgressCard.js  # Streaming cut/re-encode progress card
 │   │   ├── settingsPanel.js    # Settings page + color picker
-│   │   ├── historyPanel.js     # Desktop app cache episodes sync panel
+│   │   ├── historyPanel.js     # Episode Library on Home: own runs + desktop app cache sync
 │   │   ├── aiInstallModal.js   # AI pack / runtime install dialog
 │   │   └── toolsSetup.js       # Setup wizard (provisions the shared runtime)
 │   └── utils/
 │       ├── storage.js          # localStorage wrapper (amverge_* keys)
-│       ├── fileSystem.js       # Node wrappers, platform paths, PATH fixup, file dialogs
+│       ├── fileSystem.js       # Node wrappers, platform paths, PATH fixup, file dialogs, reveal-in-file-manager
 │       ├── tabLoader.js        # Synchronous modular tab HTML loader
 │       ├── customSelect.js     # Styled <select> replacement
 │       ├── previewProxy.js     # preview-proxy spawns for unplayable codecs

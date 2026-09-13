@@ -5,8 +5,8 @@
 .import-area {
   padding: var(--space-lg);
   flex: 1;
+  min-height: 0;
   display: flex;
-  align-items: center;
   justify-content: center;
   position: relative;
 }
@@ -14,11 +14,11 @@
 .import-idle {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: var(--space-md);
-  padding: 36px 44px;
+  padding: 28px 32px;
   width: 100%;
-  max-width: 440px;
+  min-height: 0;
   border: 1px solid transparent;
   border-radius: var(--radius-xl);
   background: rgba(14, 14, 14, 0.7);
@@ -31,6 +31,16 @@
 
 /* deliberately no :hover state. the card is a container, not a control, and
    lighting it up under the cursor read as "click me" */
+
+/* the compact welcome block (wordmark, browse button, hint) keeps its own
+   centered column above the library, which stretches full-width below it */
+.import-idle-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  flex: 0 0 auto;
+}
 
 .import-buttons {
   display: flex;
@@ -113,6 +123,7 @@
    ==================== */
 
 .import-progress {
+  align-self: center;
   padding: 32px 36px;
   width: 100%;
   max-width: 440px;
@@ -651,7 +662,6 @@
 @media (max-width: 580px) {
   .import-idle, .import-progress {
     padding: 20px 18px;
-    max-width: 92vw;
   }
 }
 

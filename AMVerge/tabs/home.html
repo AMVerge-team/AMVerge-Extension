@@ -1,24 +1,51 @@
 <div id="page-home" class="page active">
   <div id="importArea" class="import-area">
     <div id="importIdle" class="import-idle">
-      <span class="amverge-wordmark amverge-wordmark-full"><span class="wm-accent">AMV</span>erge</span>
-      <p class="import-tagline">Scene selection made easy.</p>
+      <div class="import-idle-top">
+        <span class="amverge-wordmark amverge-wordmark-full"><span class="wm-accent">AMV</span>erge</span>
+        <p class="import-tagline">Scene selection made easy.</p>
 
-      <div id="aeLayerActionWrap" class="ae-layer-action-wrap" style="display:none">
-        <button class="button button-accent button-large button-full" id="detectActiveLayerBtn" onclick="App.startImportFromActiveLayer()">
-          <svg class="icon"><use href="#icon-layers"/></svg> Detect Selected Layer (<span id="aeLayerBtnName">Footage</span>)
-        </button>
+        <div id="aeLayerActionWrap" class="ae-layer-action-wrap" style="display:none">
+          <button class="button button-accent button-large button-full" id="detectActiveLayerBtn" onclick="App.startImportFromActiveLayer()">
+            <svg class="icon"><use href="#icon-layers"/></svg> Detect Selected Layer (<span id="aeLayerBtnName">Footage</span>)
+          </button>
+        </div>
+
+        <div class="import-buttons">
+          <button class="button button-large button-accent-hover" onclick="App.startImport()">
+            <svg class="icon"><use href="#icon-folder"/></svg> Browse File
+          </button>
+        </div>
+        <div class="import-divider">
+          <span>or drop video file</span>
+        </div>
+        <p class="import-hint">MP4, MKV, MOV supported</p>
       </div>
 
-      <div class="import-buttons">
-        <button class="button button-large button-accent-hover" onclick="App.startImport()">
-          <svg class="icon"><use href="#icon-folder"/></svg> Browse File
-        </button>
+      <div class="ep-lib">
+        <div class="ep-lib-header">
+          <div class="ep-lib-title">Episode Library <span class="ep-lib-count" id="epLibCount">0</span></div>
+          <div class="ep-lib-actions">
+            <button type="button" class="ep-lib-action" id="epLibSortBtn" onclick="HistoryPanel.toggleSort()" title="Sort A-Z">
+              <svg class="icon"><use href="#icon-sort"/></svg>
+            </button>
+            <button type="button" class="ep-lib-action danger" id="historyClearBtn" style="display:none"
+                    onclick="HistoryPanel.promptClearAll()" title="Clear extension history">
+              <svg class="icon"><use href="#icon-trash"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="ep-lib-search">
+          <svg class="icon ep-lib-search-icon"><use href="#icon-search"/></svg>
+          <input type="text" class="ep-lib-search-input" id="epLibSearchInput" placeholder="Search episodes..." oninput="HistoryPanel.setSearch(this.value)">
+          <button type="button" class="ep-lib-search-clear" id="epLibSearchClear" style="display:none" onclick="HistoryPanel.clearSearch()" title="Clear search">
+            <svg class="icon"><use href="#icon-x"/></svg>
+          </button>
+        </div>
+
+        <div class="ep-lib-list" id="historyList"></div>
       </div>
-      <div class="import-divider">
-        <span>or drop video file</span>
-      </div>
-      <p class="import-hint">MP4, MKV, MOV supported</p>
     </div>
     <div id="importProgress" class="import-progress" style="display:none">
       <div class="import-status-row">
