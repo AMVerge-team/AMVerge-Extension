@@ -211,11 +211,28 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
   border-bottom: 1px solid var(--border);
   background: rgba(0, 0, 0, 0.2);
   cursor: pointer;
+  position: relative;
   transition: background var(--transition);
 }
 
 .sidebar-logo:hover {
   background: rgba(255, 255, 255, 0.04);
+}
+
+.sidebar-logo.active {
+  background: var(--selector-active-bg);
+}
+
+.sidebar-logo.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20%;
+  height: 60%;
+  width: 2.5px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
 }
 
 
@@ -277,11 +294,13 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
 }
 
 /* Sidebar CSS Tooltip */
-.sidebar-btn[data-label] {
+.sidebar-btn[data-label],
+.sidebar-logo[data-label] {
   position: relative;
 }
 
-.sidebar-btn[data-label]:hover::after {
+.sidebar-btn[data-label]:hover::after,
+.sidebar-logo[data-label]:hover::after {
   content: attr(data-label);
   position: absolute;
   left: calc(100% + 8px);

@@ -232,13 +232,13 @@
       }
       var btns = document.querySelectorAll('.sidebar-btn[data-page]');
       for (var i = 0; i < btns.length; i++) {
-        // "home" is handled by _syncScenesNavActive: it covers both the idle
+        // "home" is handled by _syncHomeNavState: it covers both the idle
         // screen (+ Episode Library) and the scene grid, and this icon means
         // specifically the grid, not just "Home is the open tab"
         if (btns[i].dataset.page === 'home') continue;
         btns[i].classList.toggle('active', btns[i].dataset.page === tab);
       }
-      this._syncScenesNavActive();
+      this._syncHomeNavState();
       if (tab === 'console') {
         if (window.ConsolePanel) window.ConsolePanel.activate();
       } else {
@@ -247,23 +247,27 @@
     },
 
     /** shows the scene grid or the idle import screen, and keeps the sidebar's
-     *  Scenes icon in sync with whichever one is actually on screen. */
+     *  Scenes icon and logo in sync with whichever one is actually on screen. */
     setSceneView: function (showScenes) {
       var scenePanel = document.getElementById('scenePanel');
       var importArea = document.getElementById('importArea');
       if (scenePanel) scenePanel.style.display = showScenes ? '' : 'none';
       if (importArea) importArea.style.display = showScenes ? 'none' : '';
-      this._syncScenesNavActive();
+      this._syncHomeNavState();
     },
 
-    _syncScenesNavActive: function () {
-      var btn = document.querySelector('.sidebar-btn[data-page="home"]');
-      if (!btn) return;
+    /** the logo (idle screen + library) and the Scenes icon (the grid) are two
+     *  different destinations sharing one tab, so exactly one of them is lit
+     *  at a time, and only while Home is the open tab at all. */
+    _syncHomeNavState: function () {
+      var scenesBtn = document.querySelector('.sidebar-btn[data-page="home"]');
+      var logo = document.querySelector('.sidebar-logo');
       var homePage = document.getElementById('page-home');
       var scenePanel = document.getElementById('scenePanel');
-      var showingScenes = !!(homePage && homePage.classList.contains('active') &&
-        scenePanel && scenePanel.style.display !== 'none');
-      btn.classList.toggle('active', showingScenes);
+      var onHomeTab = !!(homePage && homePage.classList.contains('active'));
+      var showingScenes = !!(onHomeTab && scenePanel && scenePanel.style.display !== 'none');
+      if (scenesBtn) scenesBtn.classList.toggle('active', showingScenes);
+      if (logo) logo.classList.toggle('active', onHomeTab && !showingScenes);
     },
 
     /** logo: back to the import screen, keeping the episode loaded so the home
