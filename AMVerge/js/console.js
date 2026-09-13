@@ -12,6 +12,25 @@
     };
   }
 
+  // window.consoleLog is in-memory only, so a hang or crash wipes it along
+  // with everything CEP itself logs (it overwrites its own log per session).
+  // Mirror every entry to disk too, batched so logging can't itself become a
+  // source of jank during a hot loop (e.g. per-line CLI progress output).
+  var logBuffer = [];
+  var logFlushTimer = null;
+  function queueLogWrite(line) {
+    logBuffer.push(line);
+    if (logFlushTimer) return;
+    logFlushTimer = setTimeout(function () {
+      logFlushTimer = null;
+      var lines = logBuffer;
+      logBuffer = [];
+      if (window.FileSystem && window.FileSystem.appendLog) {
+        window.FileSystem.appendLog(lines.join('\n'));
+      }
+    }, 1000);
+  }
+
   function dbg(level, source, message) {
     var entry = {
       time: new Date(),
@@ -26,6 +45,10 @@
     try {
       var cl = level === 'success' ? 'info' : level === 'warn' ? 'warn' : level === 'error' ? 'error' : 'log';
       console[cl]('[' + source + ']', message);
+    } catch (e) {}
+    try {
+      var time = ('0' + entry.time.getHours()).slice(-2) + ':' + ('0' + entry.time.getMinutes()).slice(-2) + ':' + ('0' + entry.time.getSeconds()).slice(-2);
+      queueLogWrite('[' + time + '] [' + level.toUpperCase() + '] [' + source + '] ' + entry.message);
     } catch (e) {}
     if (window.ConsolePanel && window.ConsolePanel._active) {
       window.ConsolePanel.renderLogContent();

@@ -304,6 +304,50 @@
       return process.env.XDG_DATA_HOME || path.join(home, '.local', 'share');
     },
 
+    /** where the persistent extension log lives, independent of any single
+     * CEP session. CEP overwrites its own CEPHtmlEngine*.log on every
+     * relaunch, so a hang right before a force-quit leaves nothing behind -
+     * this file exists to survive exactly that.
+     */
+    getLogPath: function () {
+      return this.path.join(this.getAppDataDir(), 'AMVerge', 'logs', 'extension.log');
+    },
+
+    _logRotated: false,
+
+    /** appends pre-formatted lines (already joined with '\n') to the
+     * persistent log, rotating the previous session's file to `.old` on the
+     * first write of this session and capping growth so a long-running AE
+     * session doesn't grow it unbounded.
+     *
+     * Deliberately has no dbg() calls anywhere in this method: dbg() is what
+     * calls appendLog, so logging a failure here would recurse.
+     */
+    appendLog: function (lines) {
+      if (!fs) return;
+      try {
+        var logPath = this.getLogPath();
+        try { fs.mkdirSync(this.path.dirname(logPath), { recursive: true }); } catch (e) {}
+
+        if (!this._logRotated) {
+          this._logRotated = true;
+          try {
+            if (fs.existsSync(logPath)) fs.copyFileSync(logPath, logPath + '.old');
+          } catch (e) {}
+          try { fs.writeFileSync(logPath, ''); } catch (e) {}
+        }
+
+        fs.appendFileSync(logPath, lines + '\n');
+
+        // cheap size cap: once past 5MB, keep only the trailing ~1MB
+        var stat = fs.statSync(logPath);
+        if (stat.size > 5 * 1024 * 1024) {
+          var tail = fs.readFileSync(logPath, 'utf8').slice(-1024 * 1024);
+          fs.writeFileSync(logPath, tail);
+        }
+      } catch (e) {}
+    },
+
     ensureExecutable: function (target) {
       if (!fs || process.platform === 'win32') return;
       try {
