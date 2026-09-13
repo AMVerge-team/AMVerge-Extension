@@ -32,7 +32,7 @@ const ROOT_README = `<h1 align="center">
 
 **AMVerge** is a free After Effects CEP extension that detects scene boundaries in video files and imports the detected clips directly into your composition as layers. It uses the \`amverge\` CLI backend for fast, lossless scene detection.
 
-> **Compatibility:** Supports After Effects CC 2017 through CC 2026+ (v15.0+). Windows only.
+> **Compatibility:** Supports After Effects CC 2017 through 2026+ (v15.0+), on Windows and macOS.
 
 ---
 
@@ -48,19 +48,30 @@ const ROOT_README = `<h1 align="center">
 
 ## Installation
 
-### Method 1: ZXP Installer (Easiest)
-1. Pick your After Effects version folder (AE2018 / AE2020 / AE2022).
-2. Download [ZXP Installer](https://aescripts.com/learn/post/zxp-installer).
-3. Drag \`AMVerge_AE2020.zxp\` onto the ZXP Installer window.
-4. Restart After Effects, go to \`Window > Extensions > AMVerge\`.
+Pick the folder that matches your After Effects release: AE2018 / AE2020 / AE2022 / AE2026 (use AE2026 for After Effects 2024 and newer).
 
-### Method 2: Windows Setup Wizard (.exe)
-1. Run \`AMVergeSetup_AE2020.exe\` from your version folder.
+### Method 1: ZXP Installer (Easiest, Windows & macOS)
+1. Download [ZXP Installer](https://aescripts.com/learn/post/zxp-installer).
+2. Drag \`AMVerge_AE2026.zxp\` onto the ZXP Installer window.
+3. Restart After Effects, go to \`Window > Extensions > AMVerge\`.
+
+### Method 2: One-click script
+- **Windows:** run \`Install-Windows.bat\` (elevates itself).
+- **macOS:** run \`Install-macOS.command\` (double-click, or \`bash Install-macOS.command\`).
+
+Both copy the extension into place and enable PlayerDebugMode. Restart After Effects afterwards.
+
+### Method 3: Windows Setup Wizard (.exe)
+1. Run \`AMVergeSetup_AE2026.exe\` from your version folder.
 2. Follow the setup wizard.
 
-### Method 3: Manual Folder Installation
-1. Copy the \`AMVerge\` folder to: \`C:\\Program Files (x86)\\Common Files\\Adobe\\CEP\\extensions\\\`
-2. Enable PlayerDebugMode: run \`Install-Windows.bat\` as admin or double-click \`Add-Keys.reg\`.
+### Method 4: Manual Folder Installation
+1. Copy the \`AMVerge\` folder to the Adobe CEP extensions directory:
+   - Windows: \`C:\\Program Files (x86)\\Common Files\\Adobe\\CEP\\extensions\\\`
+   - macOS: \`~/Library/Application Support/Adobe/CEP/extensions/\`
+2. Enable PlayerDebugMode:
+   - Windows: double-click \`Add-Keys.reg\`, or run \`Add-Keys.bat\` as admin.
+   - macOS: run \`Enable-Debug-macOS.command\`.
 3. Restart After Effects.
 
 ---
@@ -71,12 +82,17 @@ cd tools && npm install
 cd .. && npm run build:all
 \`\`\`
 
+Single target: \`npm run build:2026\` (also 2018 / 2020 / 2022). The \`.exe\` installer is
+only produced on Windows; every other output builds on both platforms.
+
 ---
 
 ## Requirements
 
-- \`pip install amverge[edge]\` for scene detection backend.
-- Python 3.9+ with PyAV and FFmpeg.
+- Scene detection backend: the first-run setup installs it into a private AMVerge
+  runtime with the bundled \`uv\`, so no system Python is required. To supply your own
+  instead, \`pip install amverge[edge]\` with Python 3.9+ (PyAV and FFmpeg).
+- GPU decode (NVDEC) needs an NVIDIA GPU and is Windows only.
 `;
 
 const INSTALL_GUIDE_TXT = `================================================================================
@@ -85,20 +101,24 @@ ${EXTENSION_NAME.toUpperCase()} AFTER EFFECTS EXTENSION - COMPLETE INSTALLATION 
 
 ${GENERAL_INFO}
 
-Each version folder (AE2018 / AE2020 / AE2022) contains:
+Each version folder (AE2018 / AE2020 / AE2022 / AE2026) contains:
  - AMVerge/           Unpacked extension files
  - AMVerge_AEXXXX.zxp Signed ZXP package
- - AMVergeSetup_AEXXXX.exe Windows setup wizard
+ - AMVergeSetup_AEXXXX.exe Windows setup wizard (built on Windows only)
  - Install-Windows.bat  One-click batch installer (copies files + enables debug mode)
+ - Install-macOS.command One-click macOS installer (copies files + enables debug mode)
+
+Use AE2026 for After Effects 2024 and newer, including After Effects 2026 (v26.x).
 
 Root-level helper files (version-agnostic):
  - Add-Keys.reg         Double-click to enable PlayerDebugMode (CSXS.9-13)
  - Add-Keys.bat         Run as admin to enable PlayerDebugMode (CSXS.9-13)
+ - Enable-Debug-macOS.command  Enable PlayerDebugMode on macOS (CSXS.9-13)
 
 --------------------------------------------------------------------------------
 METHOD 1: ZXP INSTALLATION (Easiest & Most Recommended)
 --------------------------------------------------------------------------------
-1. Open your After Effects version folder (AE2018 / AE2020 / AE2022).
+1. Open your After Effects version folder (AE2018 / AE2020 / AE2022 / AE2026).
 2. Download the free ZXP Installer utility:
    --> https://aescripts.com/learn/post/zxp-installer (Windows & macOS)
 3. Launch ZXP Installer.
@@ -107,7 +127,22 @@ METHOD 1: ZXP INSTALLATION (Easiest & Most Recommended)
 6. Open the extension from: Window > Extensions > ${EXTENSION_NAME}.
 
 --------------------------------------------------------------------------------
-METHOD 2: WINDOWS SETUP WIZARD (.exe Installer)
+METHOD 2: ONE-CLICK SCRIPT (Windows or macOS)
+--------------------------------------------------------------------------------
+Windows: run "Install-Windows.bat" from your version folder. It asks for
+administrator rights, copies the extension to the system CEP folder and adds the
+PlayerDebugMode keys.
+
+macOS: run "Install-macOS.command" from your version folder (double-click it, or
+run "bash Install-macOS.command" in Terminal). It copies the extension to
+~/Library/Application Support/Adobe/CEP/extensions/${EXTENSION_NAME}, clears the
+download quarantine flag, restores the executable bit on the bundled uv binary and
+writes the PlayerDebugMode defaults. No administrator rights are needed.
+
+Restart After Effects, then: Window > Extensions > ${EXTENSION_NAME}.
+
+--------------------------------------------------------------------------------
+METHOD 3: WINDOWS SETUP WIZARD (.exe Installer)
 --------------------------------------------------------------------------------
 1. Open your version folder and run "AMVergeSetup_AEXXXX.exe".
 2. Follow the setup wizard instructions.
@@ -115,13 +150,14 @@ METHOD 2: WINDOWS SETUP WIZARD (.exe Installer)
 4. Open After Effects, go to: Window > Extensions > ${EXTENSION_NAME}.
 
 --------------------------------------------------------------------------------
-METHOD 3: MANUAL FOLDER INSTALLATION
+METHOD 4: MANUAL FOLDER INSTALLATION
 --------------------------------------------------------------------------------
 1. Copy the "AMVerge" folder from your desired version folder to the Adobe CEP extensions dir:
   - Windows: C:\\Program Files (x86)\\Common Files\\Adobe\\CEP\\extensions\\${EXTENSION_NAME}\\
+  - macOS:   ~/Library/Application Support/Adobe/CEP/extensions/${EXTENSION_NAME}/
 
 2. Enable PlayerDebugMode (so Adobe loads unsigned extensions):
-   Choose one of the following:
+   Windows, choose one of the following:
   - Double-click "Add-Keys.reg" (recommended, one-click)
   - Run "Add-Keys.bat" as administrator
   - Run "Install-Windows.bat" from your version folder (copies files + keys in one step)
@@ -131,6 +167,18 @@ METHOD 3: MANUAL FOLDER INSTALLATION
       reg add "HKCU\\Software\\Adobe\\CSXS.11" /v PlayerDebugMode /t REG_SZ /d 1 /f
       reg add "HKCU\\Software\\Adobe\\CSXS.12" /v PlayerDebugMode /t REG_SZ /d 1 /f
       reg add "HKCU\\Software\\Adobe\\CSXS.13" /v PlayerDebugMode /t REG_SZ /d 1 /f
+
+   macOS, choose one of the following:
+  - Run "Enable-Debug-macOS.command"
+  - Run "Install-macOS.command" from your version folder (copies files + defaults in one step)
+  - Or write the defaults manually (Terminal):
+      defaults write com.adobe.CSXS.12 PlayerDebugMode 1
+      killall cfprefsd
+    (repeat for CSXS.9 through CSXS.13 to cover every CEP version)
+
+   macOS note: files unpacked from a downloaded archive carry a quarantine flag that
+   can stop the bundled uv binary from running. Clear it with:
+      /usr/bin/xattr -dr com.apple.quarantine ~/Library/Application\\ Support/Adobe/CEP/extensions/${EXTENSION_NAME}
 
 3. Restart After Effects and launch via: Window > Extensions > ${EXTENSION_NAME}.
 ================================================================================
@@ -198,6 +246,21 @@ echo.
 pause
 `;
 
+const DEBUG_COMMAND = `#!/bin/bash
+# Enable PlayerDebugMode for After Effects CEP extensions (CSXS.9 - CSXS.13)
+# Double-click this file, then restart After Effects.
+
+for v in 9 10 11 12 13; do
+  defaults write com.adobe.CSXS.$v PlayerDebugMode 1
+done
+killall cfprefsd 2>/dev/null || true
+
+echo
+echo "PlayerDebugMode enabled for CSXS.9 - CSXS.13."
+echo "Restart After Effects for the change to take effect."
+echo
+`;
+
 function generateDocs() {
     const rootDir = path.join(__dirname, '..');
     const distDir = path.join(rootDir, 'dist');
@@ -222,6 +285,11 @@ function generateDocs() {
 
     fs.writeFileSync(path.join(distDir, 'Add-Keys.bat'), REG_BAT.trim() + '\r\n', 'utf8');
     console.log(' - Generated: dist/Add-Keys.bat');
+
+    const debugCommandPath = path.join(distDir, 'Enable-Debug-macOS.command');
+    fs.writeFileSync(debugCommandPath, DEBUG_COMMAND.trim() + '\n', 'utf8');
+    fs.chmodSync(debugCommandPath, 0o755);
+    console.log(' - Generated: dist/Enable-Debug-macOS.command');
 
     console.log('Documentation generation complete!');
 }

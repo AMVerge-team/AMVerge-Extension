@@ -22,6 +22,12 @@ const VERSION_PROFILES = {
         hostVersion: '[22.0,99.9]',
         csxsVersion: '10.0',
         description: 'After Effects CC 2022+ (v22.x+)'
+    },
+    '2026': {
+        label: 'AE2026',
+        hostVersion: '[24.0,99.9]',
+        csxsVersion: '11.0',
+        description: 'After Effects 2024-2026+ (v24.x+)'
     }
 };
 
@@ -172,6 +178,11 @@ async function runBuild() {
             '<RequiredRuntime Name="CSXS" Version="' + PROFILE.csxsVersion + '"'
         );
 
+        manifestContent = manifestContent.replace(
+            /(<ExtensionManifest[^>]*?)\sVersion="[^"]*"/,
+            '$1 Version="' + PROFILE.csxsVersion + '"'
+        );
+
         fs.writeFileSync(manifestPath, manifestContent, 'utf8');
         console.log(' - Host: ' + PROFILE.hostVersion + ', CSXS: ' + PROFILE.csxsVersion);
     } else {
@@ -226,6 +237,15 @@ async function runBuild() {
     }
 
     console.log('');
+    if (process.platform !== 'win32') {
+        console.log('Skipping the Inno Setup EXE installer: it can only be compiled on Windows.');
+        writeMacInstaller(versionDir);
+        writeBatInstaller(versionDir);
+        console.log('');
+        console.log(EXTENSION_NAME + ' ' + PROFILE.label + ' build complete!');
+        return;
+    }
+
     console.log('Building Inno Setup EXE Installer...');
     const isccPaths = [
         'C:\\Program Files\\Inno Setup 6\\ISCC.exe',
@@ -269,6 +289,14 @@ async function runBuild() {
         console.log('     Please compile tools/installer.iss manually using Inno Setup on Windows to create the EXE.');
     }
 
+    writeBatInstaller(versionDir);
+    writeMacInstaller(versionDir);
+
+    console.log('');
+    console.log(EXTENSION_NAME + ' ' + PROFILE.label + ' build complete!');
+}
+
+function writeBatInstaller(versionDir) {
     const batPath = path.join(versionDir, 'Install-Windows.bat');
     console.log('');
     console.log('Generating Windows batch installer...');
@@ -333,9 +361,58 @@ async function runBuild() {
         'pause'
     ].join('\r\n'), 'utf8');
     console.log(' - Generated batch installer');
+}
 
+function writeMacInstaller(versionDir) {
+    const cmdPath = path.join(versionDir, 'Install-macOS.command');
     console.log('');
-    console.log(EXTENSION_NAME + ' ' + PROFILE.label + ' build complete!');
+    console.log('Generating macOS installer script...');
+    fs.writeFileSync(cmdPath, [
+        '#!/bin/bash',
+        'set -e',
+        '',
+        'HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
+        'SRC="$HERE/' + EXTENSION_NAME + '"',
+        'DEST="$HOME/Library/Application Support/Adobe/CEP/extensions/' + EXTENSION_NAME + '"',
+        '',
+        'echo "=========================================================="',
+        'echo "' + EXTENSION_NAME + ' After Effects Extension - macOS Installer"',
+        'echo "=========================================================="',
+        'echo',
+        '',
+        'if [ ! -d "$SRC" ]; then',
+        '  echo "[ERROR] Could not find the ' + EXTENSION_NAME + ' folder next to this script."',
+        '  exit 1',
+        'fi',
+        '',
+        'echo "[1/4] Copying extension files..."',
+        'rm -rf "$DEST"',
+        'mkdir -p "$DEST"',
+        'cp -R "$SRC/." "$DEST/"',
+        '',
+        'echo "[2/4] Clearing quarantine and restoring executable bits..."',
+        '/usr/bin/xattr -dr com.apple.quarantine "$DEST" 2>/dev/null || true',
+        'if [ -d "$DEST/bin" ]; then',
+        '  find "$DEST/bin" -type f -name uv -exec chmod 755 {} \\;',
+        'fi',
+        '',
+        'echo "[3/4] Enabling PlayerDebugMode for CEP..."',
+        'for v in 9 10 11 12 13; do',
+        '  defaults write com.adobe.CSXS.$v PlayerDebugMode 1',
+        'done',
+        'killall cfprefsd 2>/dev/null || true',
+        '',
+        'echo "[4/4] Finalizing installation..."',
+        'echo',
+        'echo "=========================================================="',
+        'echo "[SUCCESS] ' + EXTENSION_NAME + ' installed to:"',
+        'echo "$DEST"',
+        'echo "Restart After Effects, then open Window > Extensions > ' + EXTENSION_NAME + '."',
+        'echo "=========================================================="',
+        'echo'
+    ].join('\n'), 'utf8');
+    fs.chmodSync(cmdPath, 0o755);
+    console.log(' - Generated macOS installer script');
 }
 
 runBuild().catch(err => {
