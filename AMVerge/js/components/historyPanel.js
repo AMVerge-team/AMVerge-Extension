@@ -23,9 +23,6 @@
       }, 5000);
     },
 
-    /** pulled from the desktop app's own episode cache. Gated by "Sync with
-     *  AMVerge App": that setting also covers this, not just the theme, since
-     *  both read state that belongs to the app rather than this extension. */
     syncFromDesktopApp: function () {
       if (!this.app || !this.app.settings || !this.app.settings.syncThemeWithApp) {
         if (this._appEpisodes.length) {
@@ -96,9 +93,6 @@
       this.setSearch('');
     },
 
-    /** alphabetical by video name, toggling asc/desc/off. off falls back to
-     *  the natural order: app episodes first (newest first), then extension
-     *  runs (also newest first) */
     toggleSort: function () {
       this._sortDir = this._sortDir === 'asc' ? 'desc' : 'asc';
       var btn = document.getElementById('epLibSortBtn');
