@@ -94,7 +94,8 @@ Root `package.json` proxies to `tools/`. Commands: `build`, `build:2018|2020|202
 │       ├── customSelect.js     # Styled <select> replacement
 │       ├── previewProxy.js     # preview-proxy spawns for unplayable codecs
 │       ├── amvergeRuntime.js   # Shared Python runtime provisioning via bundled uv
-│       └── amvergeHandler.js   # Spawn amverge, parse IPC events
+│       ├── amvergeHandler.js   # Spawn amverge detect, parse IPC events
+│       └── exportHandler.js    # Spawn amverge export --codec copy, parse IPC events
 ├── bin/uv/<triple>/uv          # Bundled uv, staged by `npm run fetch:uv` (gitignored)
 └── jsx/host.jsx                # ExtendScript: import scenes to AE
 ```
@@ -103,20 +104,30 @@ Root `package.json` proxies to `tools/`. Commands: `build`, `build:2018|2020|202
 
 ### Data Flow
 ```
-1. User clicks "Import Video" -> PowerShell OpenFileDialog
-2. spawn("python", ["-m", "amverge", "detect", "--method", method, "--ipc", "--output", dir, video])
+1. User clicks "Import Video" -> native file dialog (PowerShell on Windows, osascript on macOS)
+2. spawn(cli, ["detect", "--method", method, "--ipc", "--output", dir, video])
 3. stderr: PROGRESS|pct|msg -> progress bar
 4. stdout: JSON array of scenes -> ClipsPanel renders grid
 5. PreviewPanel shows selected clip, "Import to AE" button
-6. evalScript('importSceneToAE(json)') per clip
-7. Clips positioned sequentially in timeline, trimmed to scene duration
+6. "Import to AE" -> ExportHandler runs `amverge export --inputs-json <selected clips> --codec copy --audio copy --container mp4 --ipc` (same export engine + CLI invocation shape the desktop app uses, minus every option but stream copy: no merge, no re-encode codec choice, no audio-track hoisting)
+7. stdout JSON `{outputs: [...]}` -> the exported files, one per selected clip, replace the preview clips as the import source
+8. evalScript('importSceneToAE(json)') per exported clip
+9. Clips positioned sequentially in timeline, trimmed to scene duration
 ```
 
 ### IPC Protocol
 ```
 PROGRESS|pct|msg  -> progress bar
-stdout: JSON array of scene objects [{scene_index,start,end,duration,path,thumbnail,original_file}]
+stdout (detect): JSON array of scene objects [{scene_index,start,end,duration,path,thumbnail,original_file}]
+stdout (export, --ipc): {"schema_version":"1.0","outputs":[...],"error":null|{"message","type"}}
 ```
+
+### Export (js/utils/exportHandler.js)
+- Runs the CLI's real `export` command against the selected scenes' preview clips (`--inputs-json`, matching the desktop app's `ClipSpec[]` shape: `{input}`, no `start_sec`/`end_sec` since the extension always has a whole pre-cut clip already, never a raw source range)
+- Hardcoded to `--codec copy --audio copy --container mp4`, no merge, no hardware/audio-track flags: this extension exposes no export options, unlike the desktop app. The CLI's own fallback ladder (`_export_one` in `core/export/engine.py`) still re-encodes to H.264 on its own if a given clip's codec cannot be stream-copied into MP4 - nothing extra needed here for that
+- Writes clips to a temp `amverge_export_<ts>.json`, deleted after the run (`_cleanup`)
+- Output dir: `<dir the selected clips live in>/export`; file stem: the episode's `original_file` (falls back to `_currentVideo`'s stem)
+- `importSelectedToAE()` in main.js calls this first; `_importClipsToAE()` (previously `importSelectedToAE`'s inner loop) then runs unchanged against the exported paths instead of the preview clips
 
 ### AE Import (host.jsx)
 - `importSceneToAE(jsonStr)` parses JSON `{filePath, layerName, autoScale, offset, prevDuration}`
@@ -142,6 +153,7 @@ stdout: JSON array of scene objects [{scene_index,start,end,duration,path,thumbn
 |---|---|
 | `js/main.js` | App singleton. Tab switching, import flow, settings, theme/accent |
 | `js/utils/amvergeHandler.js` | Spawns `amverge detect --method <method> --ipc` for all methods. Single code path `_runDetect()` parses PROGRESS| stderr events + final JSON array from stdout |
+| `js/utils/exportHandler.js` | Spawns `amverge export --codec copy --ipc` for the selection before AE import. Same `PROGRESS|`-on-stderr, final-JSON-on-stdout shape as detect |
 | `js/components/clipsPanel.js` | Scene grid rendering, selection state, click-to-select |
 | `jsx/host.jsx` | `importSceneToAE()`: footage import, sequential layering, auto-scale. Selection capture ordering is critical (capture before add) |
 | `js/utils/fileSystem.js` | Every platform difference the panel sees: PATH fixup at load, native file dialogs, app data and runtime roots, `ensureExecutable` |

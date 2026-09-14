@@ -64,6 +64,9 @@
         if (window.AmvergeHandler && window.AmvergeHandler.isRunning()) {
           window.AmvergeHandler.cancel();
         }
+        if (window.ExportHandler && window.ExportHandler.isRunning()) {
+          window.ExportHandler.cancel();
+        }
         if (window.PreviewProxy && window.PreviewProxy.cancel) {
           window.PreviewProxy.cancel();
         }
@@ -232,9 +235,6 @@
       }
       var btns = document.querySelectorAll('.sidebar-btn[data-page]');
       for (var i = 0; i < btns.length; i++) {
-        // "home" is handled by _syncHomeNavState: it covers both the idle
-        // screen (+ Episode Library) and the scene grid, and this icon means
-        // specifically the grid, not just "Home is the open tab"
         if (btns[i].dataset.page === 'home') continue;
         btns[i].classList.toggle('active', btns[i].dataset.page === tab);
       }
@@ -246,8 +246,6 @@
       }
     },
 
-    /** shows the scene grid or the idle import screen, and keeps the sidebar's
-     *  Scenes icon and logo in sync with whichever one is actually on screen. */
     setSceneView: function (showScenes) {
       var scenePanel = document.getElementById('scenePanel');
       var importArea = document.getElementById('importArea');
@@ -256,9 +254,6 @@
       this._syncHomeNavState();
     },
 
-    /** the logo (idle screen + library) and the Scenes icon (the grid) are two
-     *  different destinations sharing one tab, so exactly one of them is lit
-     *  at a time, and only while Home is the open tab at all. */
     _syncHomeNavState: function () {
       var scenesBtn = document.querySelector('.sidebar-btn[data-page="home"]');
       var logo = document.querySelector('.sidebar-logo');
@@ -270,8 +265,6 @@
       if (logo) logo.classList.toggle('active', onHomeTab && !showingScenes);
     },
 
-    /** logo: back to the import screen, keeping the episode loaded so the home
-     *  button can return to it. a run in progress owns the screen and is left alone */
     showImportScreen: function () {
       this.switchTab('home');
       if (window.AmvergeHandler && window.AmvergeHandler.isRunning()) return;
@@ -279,7 +272,6 @@
       window.ImportPanel.showIdle();
     },
 
-    /** home button: back to the grid of the last episode, or the import screen if none */
     goHome: function () {
       this.switchTab('home');
       if (window.AmvergeHandler && window.AmvergeHandler.isRunning()) return;
@@ -603,6 +595,9 @@
     },
 
     // --- Import to AE ---
+    /** exports the selection through the CLI's real export pipeline (stream
+     *  copy only, the same engine the desktop app uses) rather than handing AE
+     *  the fast preview clips directly, then imports the exported files. */
     importSelectedToAE: function () {
       var s = this;
       var selected = window.ClipsPanel.getSelectedScenes();
@@ -611,31 +606,66 @@
         return;
       }
 
+      var clips = [];
+      var withClips = [];
+      for (var i = 0; i < selected.length; i++) {
+        var clipPath = selected[i].clip_path || selected[i].path || '';
+        if (!clipPath) continue;
+        clips.push({ input: clipPath });
+        withClips.push(selected[i]);
+      }
+      if (clips.length === 0) {
+        window.showToast('Selected scenes have no clip files', 'error');
+        return;
+      }
+
+      var fs = window.FileSystem;
+      var outputDir = fs.path.join(fs.path.dirname(clips[0].input), 'export');
+      var fileStem = withClips[0].original_file ||
+        (this._currentVideo ? fs.getFileNameWithoutExtension(this._currentVideo) : 'export');
+
+      window.CutProgressCard.show('Exporting ' + clips.length + ' scene' + (clips.length !== 1 ? 's' : '') + '...');
+
+      window.ExportHandler.export(clips, outputDir, fileStem, this._resolveCli(), {
+        onProgress: function (pct, msg) {
+          window.CutProgressCard.setProgress(pct, 100);
+          if (msg) window.CutProgressCard.setTitle(msg);
+        },
+        onComplete: function (outputPaths) {
+          window.CutProgressCard.finish('Export complete');
+          s._importClipsToAE(withClips, outputPaths);
+        },
+        onError: function (err) {
+          window.CutProgressCard.hide();
+          window.showToast('Export failed: ' + err, 'error');
+          dbg('error', 'App', 'Export failed: ' + err);
+        }
+      });
+    },
+
+    /** the ExtendScript side, unchanged from before: it just imports whatever
+     *  file path it is given, one layer per clip in `clipPaths` order. */
+    _importClipsToAE: function (scenes, clipPaths) {
+      var s = this;
       this._importedCount = 0;
-      var total = selected.length;
+      var total = clipPaths.length;
 
       function importNext(i) {
-        if (i >= selected.length) {
+        if (i >= clipPaths.length) {
           window.showToast('Imported ' + total + ' scene' + (total !== 1 ? 's' : '') + ' to AE', 'success');
           s.switchTab('home');
           return;
         }
 
-        var scene = selected[i];
-        var clipPath = scene.clip_path || scene.path || '';
-        dbg('debug', 'App', 'Scene ' + i + ' clip_path=' + (scene.clip_path || 'null') + ' path=' + (scene.path || 'null'));
-        if (!clipPath) {
-          importNext(i + 1);
-          return;
-        }
-
+        var scene = scenes[i];
+        var clipPath = clipPaths[i];
         var layerName = s.settings.layerPrefix + (scene.scene_index !== undefined ? scene.scene_index + 1 : i + 1);
 
         var escapedPath = clipPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
         var escapedName = layerName.replace(/"/g, '\\"');
         var autoScale = s.settings.autoScale !== false;
         var offset = i > 0;
-        var prevDuration = i > 0 ? (selected[i - 1].end_sec || selected[i - 1].end || 0) - (selected[i - 1].start_sec || selected[i - 1].start || 0) : 0;
+        var prevDuration = i > 0 ? (scenes[i - 1].end_sec || scenes[i - 1].end || 0) - (scenes[i - 1].start_sec || scenes[i - 1].start || 0) : 0;
 
         dbg('debug', 'App', 'Importing scene ' + i + ' path=' + clipPath);
 
