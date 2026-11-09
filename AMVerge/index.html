@@ -87,6 +87,14 @@
       </nav>
 
       <div class="content-area">
+        <div id="updateBanner" class="update-banner" style="display:none">
+          <svg class="icon"><use href="#icon-import"/></svg>
+          <span id="updateBannerText" class="update-banner-text"></span>
+          <button class="button button-accent update-banner-get" onclick="UpdateCheck.openDownload()">Download</button>
+          <button class="update-banner-close" title="Dismiss" aria-label="Dismiss" onclick="UpdateCheck.dismiss()">
+            <svg class="icon"><use href="#icon-x"/></svg>
+          </button>
+        </div>
         <div data-tab="home"></div>
         <div data-tab="console"></div>
         <div data-tab="settings"></div>
@@ -260,6 +268,7 @@
   <script src="js/utils/previewProxy.js"></script>
   <script src="js/utils/customSelect.js"></script>
   <script src="js/utils/amvergeRuntime.js"></script>
+  <script src="js/utils/updateCheck.js"></script>
   <script src="js/components/importPanel.js"></script>
   <script src="js/components/clipsPanel.js"></script>
   <script src="js/components/videoPlayer.js"></script>

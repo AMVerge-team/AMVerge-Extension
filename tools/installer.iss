@@ -1,9 +1,14 @@
 ; AMVerge After Effects Extension Inno Setup Script
 ; Compile this script using Inno Setup to create AMVergeSetup.exe
 
+; build.js passes AppVer from CSXS/manifest.xml; the fallback is for manual compiles
+#ifndef AppVer
+  #define AppVer "1.0.0"
+#endif
+
 [Setup]
 AppName=AMVerge After Effects Extension
-AppVersion=1.0.0
+AppVersion={#AppVer}
 AppPublisher=AMVerge
 AppPublisherURL=https://github.com/Moongetsu/AMVerge-Extension
 DefaultDirName={commoncf}\Adobe\CEP\extensions\AMVerge
@@ -16,12 +21,12 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
-VersionInfoVersion=1.0.0
+VersionInfoVersion={#AppVer}
 VersionInfoCompany=AMVerge
 VersionInfoDescription=AMVerge After Effects Extension Setup Wizard
 VersionInfoCopyright=Copyright (C) 2026 AMVerge
 VersionInfoProductName=AMVerge After Effects Extension Installer
-VersionInfoProductVersion=1.0.0
+VersionInfoProductVersion={#AppVer}
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

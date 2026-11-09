@@ -322,6 +322,32 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
   background: rgba(0, 0, 0, 0.2);
 }
 
+/* new version notice, above whichever tab is open */
+.update-banner {
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 10px;
+  border-bottom: 1px solid rgb(var(--accent-rgb) / 0.4);
+  background: rgb(var(--accent-rgb) / 0.12);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.update-banner > .icon { width: 14px; height: 14px; color: var(--accent); flex-shrink: 0; }
+.update-banner-text { flex: 1; min-width: 0; }
+.update-banner-get { padding: 3px 10px; font-size: 11px; }
+.update-banner-close {
+  display: flex;
+  padding: 2px;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.update-banner-close:hover { color: #fff; }
+.update-banner-close .icon { width: 12px; height: 12px; }
+
 .page {
   flex: 1;
   min-height: 0;

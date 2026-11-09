@@ -256,9 +256,12 @@ async function runBuild() {
             console.log(' - Compiling installer script...');
             const issPath = path.join(__dirname, 'installer.iss');
             const outputName = EXTENSION_NAME + 'Setup_' + PROFILE.label;
-            const cmd = isccPath === 'iscc'
-                ? 'iscc /DSourcePath="' + DIST_DIR + '" /DOutputDir="' + versionDir + '" /DOutputName="' + outputName + '" "' + issPath + '"'
-                : '"' + isccPath + '" /DSourcePath="' + DIST_DIR + '" /DOutputDir="' + versionDir + '" /DOutputName="' + outputName + '" "' + issPath + '"';
+            // the installer's version comes from the manifest, the one place a release bumps
+            const manifestXml = fs.readFileSync(path.join(SRC_DIR, 'CSXS', 'manifest.xml'), 'utf8');
+            const versionMatch = manifestXml.match(/ExtensionBundleVersion="([^"]+)"/);
+            const appVer = versionMatch ? versionMatch[1] : '1.0.0';
+            const args = ' /DSourcePath="' + DIST_DIR + '" /DOutputDir="' + versionDir + '" /DOutputName="' + outputName + '" /DAppVer="' + appVer + '" "' + issPath + '"';
+            const cmd = (isccPath === 'iscc' ? 'iscc' : '"' + isccPath + '"') + args;
             execSync(cmd, { stdio: 'inherit' });
             console.log('Successfully compiled installer EXE!');
         } catch (execErr) {

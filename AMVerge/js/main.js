@@ -63,6 +63,9 @@
         this.runDoctor();
       }
 
+      // banner sits in the main ui, so a run during setup shows once setup ends
+      window.UpdateCheck.run();
+
       dbg('info', 'App', 'AMVerge ready');
     },
 

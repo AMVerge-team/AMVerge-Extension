@@ -111,8 +111,6 @@
         }
         var decodeBtn = document.getElementById('gpuDecodeBtn');
         if (decodeBtn) decodeBtn.textContent = status.gpuDecodeOn ? 'Disable' : 'Enable';
-        // which Python all of the above describes, since it is not obvious and
-        // is the first thing worth knowing when a row looks wrong
         if (envEl) envEl.textContent = status.interpreter || '';
       } else {
         if (pyEl) { pyEl.textContent = 'Not checked'; pyEl.style.color = ''; }

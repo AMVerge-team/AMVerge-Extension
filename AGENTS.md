@@ -31,6 +31,15 @@ Root `package.json` proxies to `tools/`. Commands: `build`, `build:2018|2020|202
 - No test framework. No lint/typecheck.
 - Build: copy source -> obfuscate JS -> compile JSXBIN -> patch manifest -> sign ZXP.
 
+## Releasing
+
+1. Bump `ExtensionBundleVersion` and `Version` in `AMVerge/CSXS/manifest.xml` (the installer reads its version from there).
+2. Push a matching tag: `git tag v1.1.0 && git push origin v1.1.0`.
+3. `.github/workflows/release.yml` builds AE2018/2020/2022 on Windows and publishes the 3 installers + 3 ZXPs as a GitHub release. It fails if the tag doesn't match the manifest.
+4. The panel's update banner (`js/utils/updateCheck.js`) reads `releases/latest` and links to the release page. A tag with a dash (`v1.1.0-beta1`) is a pre-release and never triggers the banner.
+
+Optional secret `EXTENSION_CERT_P12_BASE64` (base64 of `tools/cert.p12`) keeps one signing cert across releases; without it each build self-signs.
+
 ## Tech Stack
 
 | Layer | Tech |
