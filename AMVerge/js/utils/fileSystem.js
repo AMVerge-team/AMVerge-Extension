@@ -296,6 +296,7 @@
         // Check if there is an explicit theme.json
         var jsonPaths = [
           path.join(roamingAppData, 'app.amverge', 'theme.json'),
+          path.join(this.getHomeDir(), 'Library', 'Application Support', 'app.amverge', 'theme.json'),
           path.join(roamingAppData, 'com.amverge.cli', 'theme.json'),
           path.join(roamingAppData, 'AMVerge', 'theme.json')
         ];
