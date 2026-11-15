@@ -1,7 +1,12 @@
 ﻿(function () {
+  var MAX_STAGE_BYTES = 4 * 1024 * 1024 * 1024;
+
   var AmvergeHandler = {
     _proc: null,
     _cancelling: false,
+    _stagingInFlight: false,
+    _stagingDir: '',
+    _stagingFile: '',
     _outputDir: '',
     _scenes: [],
     _onProgress: null,
@@ -15,14 +20,16 @@
 
     detect: function (videoPath, outputDir, opts, callbacks) {
       var s = this;
-      if (this._proc) {
+      if (this.isRunning()) {
         if (callbacks && callbacks.onError) callbacks.onError('Already running');
         return;
       }
 
       this._outputDir = outputDir;
       this._scenes = [];
-      this._cancelling = false; 
+      this._cancelling = false;
+      this._stagingDir = '';
+      this._stagingFile = '';
       this._onProgress = callbacks.onProgress || null;
       this._onComplete = callbacks.onComplete || null;
       this._onError = callbacks.onError || null;
@@ -42,7 +49,89 @@
 
       window.FileSystem.createFolder(outputDir);
 
-      this._runDetect(videoPath, method, cli, opts);
+      this._prepareInput(videoPath, function (inputPath) {
+        if (s._cancelling) {
+          s._cleanup();
+          return;
+        }
+        s._runDetect(inputPath, method, cli, opts);
+      });
+    },
+
+    /** copy cross-drive sources (e.g. D: HDD -> C: NVMe temp) sequentially before
+     *  spawning ffmpeg -f segment; keeps the exact basename so clip/thumbnail
+     *  filenames stay identical. */
+    _prepareInput: function (videoPath, done) {
+      var fsMod = window.FileSystem;
+      var nodeFs = fsMod && fsMod.fs;
+      var pathMod = fsMod && fsMod.path;
+      if (process.platform !== 'win32' || !nodeFs || !pathMod || !nodeFs.copyFile) {
+        done(videoPath);
+        return;
+      }
+
+      var tempRoot = fsMod.getTempDir ? fsMod.getTempDir() : '';
+      var srcMatch = /^([A-Za-z]):/.exec(videoPath);
+      var tmpMatch = /^([A-Za-z]):/.exec(tempRoot);
+      if (!srcMatch || !tmpMatch || srcMatch[1].toLowerCase() === tmpMatch[1].toLowerCase()) {
+        done(videoPath);
+        return;
+      }
+
+      try {
+        var st = nodeFs.statSync(videoPath);
+        if (!st || !st.isFile() || st.size <= 0 || st.size > MAX_STAGE_BYTES) {
+          done(videoPath);
+          return;
+        }
+      } catch (e) {
+        done(videoPath);
+        return;
+      }
+
+      var stageDir = pathMod.join(tempRoot, 'AMVerge', '_stage_' + Date.now() + '_' + process.pid);
+      var stageFile = pathMod.join(stageDir, pathMod.basename(videoPath));
+      try {
+        fsMod.createFolder(stageDir);
+      } catch (e) {
+        done(videoPath);
+        return;
+      }
+
+      this._stagingDir = stageDir;
+      this._stagingFile = stageFile;
+      this._stagingInFlight = true;
+      if (this._onProgress) this._onProgress(2, 'Staging video on fast drive...', 'detect');
+      dbg('info', 'Amverge', 'Staging cross-drive input to ' + stageFile);
+
+      var s = this;
+      nodeFs.copyFile(videoPath, stageFile, function (err) {
+        s._stagingInFlight = false;
+        if (err || s._cancelling) {
+          if (err) dbg('warn', 'Amverge', 'Staging failed, reading directly: ' + err.message);
+          s._cleanupStaging();
+          done(videoPath);
+          return;
+        }
+        done(stageFile);
+      });
+    },
+
+    _cleanupStaging: function () {
+      var nodeFs = window.FileSystem && window.FileSystem.fs;
+      if (!nodeFs) {
+        this._stagingDir = '';
+        this._stagingFile = '';
+        return;
+      }
+      try {
+        if (this._stagingFile) nodeFs.unlinkSync(this._stagingFile);
+      } catch (e) {}
+      try {
+        if (this._stagingDir) nodeFs.rmdirSync(this._stagingDir);
+      } catch (e) {}
+      this._stagingDir = '';
+      this._stagingFile = '';
     },
 
     /** handle one streaming IPC line, returning true when it was one. unknown lines fall through to the log. */
@@ -186,24 +275,27 @@
     },
 
     cancel: function () {
-      if (!this._proc) return;
+      if (!this._proc && !this._stagingInFlight) return;
       this._cancelling = true;
-      try {
-        if (process.platform === 'win32') {
-          window.FileSystem.childProcess.execSync('taskkill /F /T /PID ' + this._proc.pid, { windowsHide: true });
-        } else {
-          this._proc.kill('SIGTERM');
-        }
-      } catch (e) {}
-      this._cleanup();
+      if (this._proc) {
+        try {
+          if (process.platform === 'win32') {
+            window.FileSystem.childProcess.execSync('taskkill /F /T /PID ' + this._proc.pid, { windowsHide: true });
+          } else {
+            this._proc.kill('SIGTERM');
+          }
+        } catch (e) {}
+      }
+      if (!this._stagingInFlight) this._cleanup();
     },
 
     isRunning: function () {
-      return this._proc !== null;
+      return this._proc !== null || this._stagingInFlight;
     },
 
     _cleanup: function () {
       this._proc = null;
+      if (!this._stagingInFlight) this._cleanupStaging();
     }
   };
 

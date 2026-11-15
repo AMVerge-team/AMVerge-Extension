@@ -10,10 +10,17 @@
 
   // capped: a grid with no thumbnails would otherwise spawn hundreds at once
   var MAX_URGENT = 2;
+  var DIRECT_PROBE_CONCURRENCY = 6;
+  var DIRECT_PREWARM_CONCURRENCY = 2;
 
   var PROBE_TIMEOUT = 60000;
   var URGENT_TIMEOUT = 120000;
   var BATCH_TIMEOUT = 15 * 60 * 1000;
+
+  var PLAYABLE_CODECS = { h264: true, vp8: true, vp9: true, av1: true, theora: true };
+  var PLAYABLE_PIX_FMTS = {
+    yuv420p: true, yuvj420p: true, yuv422p: true, yuvj422p: true, rgb24: true, bgr24: true
+  };
 
   /** browser-playable paths for an episode's clips.
    *
@@ -48,12 +55,37 @@
     _clis: null,
     // the CLI that answered last, tried first from then on
     _cli: null,
+    // direct ffprobe/ffmpeg binaries (bypasses Python cold start)
+    _ffprobe: undefined,
+    _ffmpeg: undefined,
+    _resumePrewarm: null,
     // CLIs found to lack `preview-proxy`. version skew between the app's venv
     // and a dev checkout is normal, so the preferred CLI often cannot build one
     _unsupported: {},
     // bumped on every reset, so results from the previous episode are ignored
     // instead of populating a cache that no longer matches the grid
     _episode: 0,
+
+    /** expected on-disk proxy path matching AMVerge-CLI's naming */
+    _proxyPathFor: function (clipPath) {
+      var fs = window.FileSystem;
+      if (!fs || !fs.path || !clipPath) return '';
+      var dir = fs.path.dirname(clipPath);
+      var ext = fs.path.extname(clipPath);
+      var base = fs.path.basename(clipPath, ext);
+      return fs.path.join(dir, base + '.x264_480p30.preview.mp4');
+    },
+
+    _nonEmptyFile: function (p) {
+      var fs = window.FileSystem;
+      if (!p || !fs || !fs.fs) return false;
+      try {
+        var st = fs.fs.statSync(p);
+        return st && st.isFile() && st.size > 0;
+      } catch (e) {
+        return false;
+      }
+    },
 
     /** point at a new episode, discarding whatever the last one built */
     reset: function (scenes, app) {
@@ -70,12 +102,14 @@
       this._wantUrgent = {};
       this._byNormPath = {};
       this._clips = [];
+      this._resumePrewarm = null;
 
       if (!scenes || !scenes.length) return;
 
       // `collect_scenes` names clips optimistically, so some files never exist
       var fs = window.FileSystem;
       this._known = {};
+      var toProbe = [];
       for (var i = 0; i < scenes.length; i++) {
         var p = scenes[i].clip_path || scenes[i].path || '';
         if (!p) continue;
@@ -83,18 +117,63 @@
         this._clips.push(p);
         this._known[p] = true;
         this._byNormPath[this._norm(p)] = p;
+        // Skip probing clips whose preview proxy is already on disk, or Phase 2
+        // re-encoded clips which smart_cut already wrote as 8-bit H.264 yuv420p
+        var diskProxy = this._proxyPathFor(p);
+        if (this._nonEmptyFile(diskProxy)) {
+          this._cache[p] = diskProxy;
+          this._playable[p] = false;
+        } else if (scenes[i].clip_mode === 'reencode') {
+          this._cache[p] = p;
+          this._playable[p] = true;
+        } else {
+          toProbe.push(p);
+        }
       }
       if (!this._clips.length) return;
+      if (!toProbe.length) return;
 
       this._clis = app && app._resolveCliCandidates ? app._resolveCliCandidates() : null;
-      if (!this._clis || !this._clis.length ||
-          !window.FileSystem || !window.FileSystem.childProcess) {
+      this._resolveBinaries();
+      if (!this._ffprobe &&
+          (!this._clis || !this._clis.length ||
+           !window.FileSystem || !window.FileSystem.childProcess)) {
         // nothing to build with, so originals are all there is
         this._serveOriginals = true;
         return;
       }
 
-      this._probeAll();
+      this._probeAll(toProbe);
+    },
+
+    /** add newly materialized clips without discarding probes/proxies already built */
+    refresh: function (scenes, app) {
+      if (!scenes || !scenes.length) return;
+      if (!this._clips.length) {
+        this.reset(scenes, app);
+        return;
+      }
+      var fs = window.FileSystem;
+      var added = [];
+      for (var i = 0; i < scenes.length; i++) {
+        var p = scenes[i].clip_path || scenes[i].path || '';
+        if (!p || this._known[p]) continue;
+        if (fs && fs.fileExists && !fs.fileExists(p)) continue;
+        this._clips.push(p);
+        this._known[p] = true;
+        this._byNormPath[this._norm(p)] = p;
+        var diskProxy = this._proxyPathFor(p);
+        if (this._nonEmptyFile(diskProxy)) {
+          this._cache[p] = diskProxy;
+          this._playable[p] = false;
+        } else if (scenes[i].clip_mode === 'reencode') {
+          this._cache[p] = p;
+          this._playable[p] = true;
+        } else {
+          added.push(p);
+        }
+      }
+      if (added.length) this._probeAll(added);
     },
 
     /** the playable path for a clip if it is already known, else null */
@@ -102,7 +181,14 @@
       if (this._serveOriginals) return clipPath;
       // not a clip means the source video: never worth proxying a whole episode
       if (!this._known[clipPath]) return clipPath;
-      return this._cache[clipPath] || null;
+      if (this._cache[clipPath]) return this._cache[clipPath];
+      // 0ms disk-cache fast path: if the proxy already exists beside the clip, use it
+      var diskProxy = this._proxyPathFor(clipPath);
+      if (this._nonEmptyFile(diskProxy)) {
+        this._cache[clipPath] = diskProxy;
+        return diskProxy;
+      }
+      return null;
     },
 
     /** playable path for `clipPath`; the callback always runs exactly once, falling back to the original. `urgent` jumps the background queue. */
@@ -133,19 +219,147 @@
       this._urgent = {};
       this._wantUrgent = {};
       this._probing = {};
+      this._resumePrewarm = null;
       this._flushWaiters();
     },
 
-    /** probe every clip, in grid order, a chunk per spawn.
-     *
-     * `--probe` is one ffprobe per clip and no transcode, so asking about all of
-     * them costs little. Rows stream out as each is read, so a clip becomes
-     * usable without waiting for the rest of the batch.
-     */
-    _probeAll: function () {
+    _resolveBinaries: function () {
+      if (this._ffprobe !== undefined && this._ffmpeg !== undefined) return;
+      this._ffprobe = null;
+      this._ffmpeg = null;
+      var fs = window.FileSystem;
+      if (!fs || !fs.path || !fs.childProcess) return;
+
+      var ext = process.platform === 'win32' ? '.exe' : '';
+      var dirs = [];
+      var local = process.env.LOCALAPPDATA || '';
+      if (local) {
+        dirs.push(fs.path.join(local, 'AMVerge', 'bin', 'amverge-x86_64-pc-windows-msvc', '_internal'));
+      }
+      if (fs.getExtensionRoot) {
+        var root = fs.getExtensionRoot();
+        if (root) dirs.push(fs.path.join(root, 'bin'));
+      }
+
+      var findBin = function (name) {
+        var file = name + ext;
+        for (var i = 0; i < dirs.length; i++) {
+          var p = fs.path.join(dirs[i], file);
+          if (fs.fileExists && fs.fileExists(p)) return p;
+        }
+        try {
+          fs.childProcess.execFileSync(file, ['-version'], {
+            encoding: 'utf8', timeout: 3000, windowsHide: true
+          });
+          return file;
+        } catch (e) {}
+        return null;
+      };
+
+      this._ffprobe = findBin('ffprobe');
+      this._ffmpeg = findBin('ffmpeg');
+      if (this._ffprobe && this._ffmpeg) {
+        dbg('info', 'Proxy', 'Using direct ffprobe/ffmpeg (fast path)');
+      }
+    },
+
+    _probeFileDirect: function (clipPath, onDone) {
       var s = this;
       var ep = this._episode;
-      var chunks = this._chunk(this._clips, MAX_CLIPS_PER_PROBE);
+      var fs = window.FileSystem;
+      var settled = false;
+      var done = function (row) {
+        if (settled) return;
+        settled = true;
+        if (ep === s._episode) onDone(row);
+      };
+
+      var proc;
+      try {
+        proc = fs.childProcess.spawn(this._ffprobe, [
+          '-v', 'error',
+          '-select_streams', 'v:0',
+          '-show_entries', 'stream=codec_name,pix_fmt',
+          '-of', 'json',
+          clipPath
+        ], { windowsHide: true });
+      } catch (e) {
+        done({ original: clipPath, playable: true });
+        return;
+      }
+      this._procs.push(proc);
+
+      var out = '';
+      var timer = setTimeout(function () {
+        s._kill(proc);
+        s._forget(proc);
+        done({ original: clipPath, playable: true });
+      }, 10000);
+
+      proc.stdout.on('data', function (d) { out += d.toString(); });
+      proc.on('error', function () {
+        clearTimeout(timer);
+        s._forget(proc);
+        done({ original: clipPath, playable: true });
+      });
+      proc.on('close', function (code) {
+        clearTimeout(timer);
+        s._forget(proc);
+        if (code !== 0) {
+          done({ original: clipPath, playable: true });
+          return;
+        }
+        try {
+          var parsed = JSON.parse(out);
+          var st = parsed && parsed.streams && parsed.streams[0];
+          if (!st) {
+            done({ original: clipPath, playable: true });
+            return;
+          }
+          var codec = String(st.codec_name || '').toLowerCase();
+          var pix = String(st.pix_fmt || '').toLowerCase();
+          var playable = !!(PLAYABLE_CODECS[codec] && PLAYABLE_PIX_FMTS[pix]);
+          done({ original: clipPath, playable: playable });
+        } catch (e) {
+          done({ original: clipPath, playable: true });
+        }
+      });
+    },
+
+    /** probe every clip, in grid order. uses parallel direct ffprobe when
+     *  available (no Python cold-start), falling back to the CLI batch.
+     */
+    _probeAll: function (clips) {
+      var list = clips || this._clips;
+      if (!list.length) return;
+      var s = this;
+      var ep = this._episode;
+
+      if (this._ffprobe) {
+        var idx = 0;
+        var active = 0;
+        var next = function () {
+          if (ep !== s._episode) return;
+          while (active < DIRECT_PROBE_CONCURRENCY && idx < list.length) {
+            var clip = list[idx++];
+            if (s._playable[clip] !== undefined) continue;
+            active++;
+            (function (c) {
+              s._probeFileDirect(c, function (row) {
+                active--;
+                if (ep !== s._episode) return;
+                s._recordProbe(row);
+                next();
+              });
+            })(clip);
+          }
+          if (active === 0 && idx >= list.length) s._startPrewarm();
+        };
+        next();
+        return;
+      }
+
+      var chunks = this._chunk(list, MAX_CLIPS_PER_PROBE);
       var answered = false;
 
       var runChunk = function (i) {
@@ -173,14 +387,22 @@
       runChunk(0);
     },
 
-    /** a click can land before the batch reaches that clip, and one ffprobe is
-     *  cheap enough that it should not wait for the queue */
+    /** a click can land before the batch reaches that clip */
     _probeNow: function (clipPath) {
       if (this._probing[clipPath] || !this._known[clipPath]) return;
       this._probing[clipPath] = true;
 
       var s = this;
       var ep = this._episode;
+      if (this._ffprobe) {
+        this._probeFileDirect(clipPath, function (row) {
+          if (ep !== s._episode) return;
+          delete s._probing[clipPath];
+          s._recordProbe(row);
+        });
+        return;
+      }
+
       this._spawn(['preview-proxy', clipPath, '--probe', '--json'], PROBE_TIMEOUT,
         function (row) { if (ep === s._episode) s._recordProbe(row); },
         function () {
@@ -224,6 +446,76 @@
       if (this._wantUrgent[clip]) this._buildNow(clip);
     },
 
+    _buildFileDirect: function (clipPath, onDone) {
+      var s = this;
+      var ep = this._episode;
+      var fs = window.FileSystem;
+      var target = this._proxyPathFor(clipPath);
+      if (this._nonEmptyFile(target)) {
+        onDone(target);
+        return;
+      }
+      if (!target || !this._ffmpeg || !fs || !fs.fs || !fs.childProcess) {
+        onDone(clipPath);
+        return;
+      }
+
+      var tmp = target.replace(/\.mp4$/i, '') + '.' + process.pid + '.tmp.mp4';
+      var settled = false;
+      var finish = function (resultPath) {
+        if (settled) return;
+        settled = true;
+        if (ep === s._episode) onDone(resultPath);
+      };
+
+      var proc;
+      try {
+        proc = fs.childProcess.spawn(this._ffmpeg, [
+          '-hide_banner', '-loglevel', 'error', '-y',
+          '-i', clipPath,
+          '-c:v', 'libx264',
+          '-vf', "scale=-2:'min(480,ih)'",
+          '-preset', 'ultrafast',
+          '-crf', '30',
+          '-pix_fmt', 'yuv420p',
+          '-movflags', '+faststart',
+          '-c:a', 'aac', '-b:a', '96k',
+          tmp
+        ], { windowsHide: true });
+      } catch (e) {
+        finish(clipPath);
+        return;
+      }
+      this._procs.push(proc);
+
+      var timer = setTimeout(function () {
+        s._kill(proc);
+        s._forget(proc);
+        try { fs.fs.unlinkSync(tmp); } catch (e) {}
+        finish(clipPath);
+      }, URGENT_TIMEOUT);
+
+      proc.on('error', function () {
+        clearTimeout(timer);
+        s._forget(proc);
+        try { fs.fs.unlinkSync(tmp); } catch (e) {}
+        finish(clipPath);
+      });
+      proc.on('close', function (code) {
+        clearTimeout(timer);
+        s._forget(proc);
+        if (code === 0 && s._nonEmptyFile(tmp)) {
+          try {
+            fs.fs.renameSync(tmp, target);
+            finish(target);
+            return;
+          } catch (e) {}
+        }
+        try { fs.fs.unlinkSync(tmp); } catch (e) {}
+        finish(clipPath);
+      });
+    },
+
     _startPrewarm: function () {
       if (!this._needBuild.length) {
         dbg('info', 'Proxy', 'Clips play as-is, no proxies needed');
@@ -238,6 +530,36 @@
     _prewarm: function (clips) {
       var s = this;
       var ep = this._episode;
+
+      if (this._ffmpeg) {
+        var idx = 0;
+        var active = 0;
+        var pump = function () {
+          if (ep !== s._episode) return;
+          // yield CPU while an urgent clicked clip is building
+          if (s._urgentCount() > 0) return;
+          while (active < DIRECT_PREWARM_CONCURRENCY && idx < clips.length) {
+            var clip = clips[idx++];
+            if (s._cache[clip] || s._urgent[clip]) continue;
+            active++;
+            (function (c) {
+              s._buildFileDirect(c, function (path) {
+                active--;
+                if (ep !== s._episode) return;
+                s._resolve(c, path || c);
+                pump();
+              });
+            })(clip);
+          }
+          if (active === 0 && idx >= clips.length) {
+            dbg('info', 'Proxy', 'Preview proxies ready');
+          }
+        };
+        this._resumePrewarm = pump;
+        pump();
+        return;
+      }
+
       var chunks = this._chunk(clips);
 
       var runChunk = function (i) {
@@ -257,11 +579,26 @@
     /** jump one clip ahead of the queue; over the cap it just waits for the prewarm pass */
     _buildNow: function (clipPath) {
       if (this._urgent[clipPath] || this._cache[clipPath]) return;
+      var diskProxy = this._proxyPathFor(clipPath);
+      if (this._nonEmptyFile(diskProxy)) {
+        this._resolve(clipPath, diskProxy);
+        return;
+      }
       if (this._urgentCount() >= MAX_URGENT) return;
       this._urgent[clipPath] = true;
 
       var s = this;
       var ep = this._episode;
+      if (this._ffmpeg) {
+        this._buildFileDirect(clipPath, function (path) {
+          if (ep !== s._episode) return;
+          delete s._urgent[clipPath];
+          s._resolve(clipPath, path || clipPath);
+          if (s._urgentCount() === 0 && s._resumePrewarm) s._resumePrewarm();
+        });
+        return;
+      }
+
       this._spawn(['preview-proxy', clipPath, '--json'], URGENT_TIMEOUT,
         function (row) { if (ep === s._episode) s._record(row); },
         function () {

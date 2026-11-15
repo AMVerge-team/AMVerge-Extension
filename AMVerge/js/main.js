@@ -690,47 +690,130 @@
       window.StorageManager.saveSettings(this.settings);
     },
 
+    _bgExtractSeq: 0,
+    _bgFrameCache: {},
+
     applyBackgroundMedia: function () {
       var img = document.getElementById('appBgImage');
-      var vid = document.getElementById('appBgVideo');
       var clearBtn = document.getElementById('clearBgMediaBtn');
       var btnLabel = document.getElementById('bgMediaBtnLabel');
 
-      if (!img || !vid) return;
+      if (!img) return;
+
+      this._bgExtractSeq = (this._bgExtractSeq || 0) + 1;
+      var seq = this._bgExtractSeq;
 
       var mediaPath = this.settings.backgroundImagePath;
       if (!mediaPath) {
         img.style.display = 'none';
         img.src = '';
-        vid.style.display = 'none';
-        vid.src = '';
         if (clearBtn) clearBtn.style.display = 'none';
         if (btnLabel) btnLabel.textContent = 'Upload';
         return;
       }
 
+      var opacity = this.settings.backgroundOpacity !== undefined ? this.settings.backgroundOpacity : 1;
+      var blur = 'blur(' + (this.settings.backgroundBlur || 0) + 'px)';
+      img.style.opacity = opacity;
+      img.style.filter = blur;
+
       var isVideo = /\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(mediaPath);
       var fileUrl = 'file:///' + encodeURI(mediaPath.replace(/\\/g, '/'));
 
-      if (isVideo) {
-        img.style.display = 'none';
-        vid.src = fileUrl;
-        vid.style.display = 'block';
-        vid.style.opacity = this.settings.backgroundOpacity !== undefined ? this.settings.backgroundOpacity : 1;
-        vid.style.filter = 'blur(' + (this.settings.backgroundBlur || 0) + 'px)';
-        var playP = vid.play();
-        if (playP && playP.catch) playP.catch(function () {});
-      } else {
-        vid.style.display = 'none';
-        vid.pause();
+      if (!isVideo) {
         img.src = fileUrl;
         img.style.display = 'block';
-        img.style.opacity = this.settings.backgroundOpacity !== undefined ? this.settings.backgroundOpacity : 1;
-        img.style.filter = 'blur(' + (this.settings.backgroundBlur || 0) + 'px)';
+      } else if (this._bgFrameCache[mediaPath]) {
+        img.src = this._bgFrameCache[mediaPath];
+        img.style.display = 'block';
+      } else {
+        this._extractBgVideoFrame(mediaPath, fileUrl, seq, img);
       }
 
       if (clearBtn) clearBtn.style.display = 'inline-flex';
       if (btnLabel) btnLabel.textContent = 'Change';
+    },
+
+    /** grab a single still frame from a video background so CEF never runs a
+     *  second looping <video> behind the clip grid and preview player. */
+    _extractBgVideoFrame: function (mediaPath, fileUrl, seq, img) {
+      var s = this;
+      var finished = false;
+      var probe = document.createElement('video');
+      probe.muted = true;
+      probe.playsInline = true;
+      probe.preload = 'auto';
+
+      var dispose = function () {
+        probe.onloadeddata = null;
+        probe.onerror = null;
+        try {
+          probe.pause();
+          probe.removeAttribute('src');
+          probe.load();
+        } catch (e) {}
+      };
+
+      var applySrc = function (src) {
+        if (finished) return;
+        finished = true;
+        dispose();
+        if (s._bgExtractSeq !== seq) return;
+        s._bgFrameCache[mediaPath] = src;
+        img.src = src;
+        img.style.display = 'block';
+      };
+
+      var fallbackFfmpeg = function () {
+        if (finished) return;
+        var fsMod = window.FileSystem;
+        var cp = fsMod && fsMod.childProcess;
+        var pathMod = fsMod && fsMod.path;
+        if (!cp || !pathMod || !fsMod.getTempDir) {
+          finished = true;
+          dispose();
+          return;
+        }
+        if (window.PreviewProxy && window.PreviewProxy._resolveBinaries) {
+          window.PreviewProxy._resolveBinaries();
+        }
+        var ff = (window.PreviewProxy && window.PreviewProxy._ffmpeg) || 'ffmpeg';
+        var outDir = pathMod.join(fsMod.getTempDir(), 'AMVerge');
+        try { fsMod.createFolder(outDir); } catch (e) {}
+        var outFile = pathMod.join(outDir, 'bg_still_' + Date.now() + '.jpg');
+        cp.execFile(ff, ['-y', '-v', 'error', '-ss', '0.1', '-i', mediaPath, '-frames:v', '1', '-q:v', '2', outFile], {
+          windowsHide: true, timeout: 10000
+        }, function (err) {
+          if (err) {
+            finished = true;
+            dispose();
+            return;
+          }
+          applySrc('file:///' + encodeURI(outFile.replace(/\\/g, '/')));
+        });
+      };
+
+      probe.onloadeddata = function () {
+        if (finished) return;
+        try {
+          var w = probe.videoWidth || 1280;
+          var h = probe.videoHeight || 720;
+          var canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(probe, 0, 0, w, h);
+          applySrc(canvas.toDataURL('image/jpeg', 0.92));
+        } catch (e) {
+          fallbackFfmpeg();
+        }
+      };
+
+      probe.onerror = function () {
+        fallbackFfmpeg();
+      };
+
+      probe.src = fileUrl;
     },
 
     pickBackgroundMedia: function () {
@@ -758,9 +841,7 @@
       var lbl = document.getElementById('bgOpacityValue');
       if (lbl) lbl.textContent = Math.round(num * 100) + '%';
       var img = document.getElementById('appBgImage');
-      var vid = document.getElementById('appBgVideo');
       if (img) img.style.opacity = num;
-      if (vid) vid.style.opacity = num;
       window.StorageManager.saveSettings(this.settings);
     },
 
@@ -770,9 +851,7 @@
       var lbl = document.getElementById('bgBlurValue');
       if (lbl) lbl.textContent = num + 'px';
       var img = document.getElementById('appBgImage');
-      var vid = document.getElementById('appBgVideo');
       if (img) img.style.filter = 'blur(' + num + 'px)';
-      if (vid) vid.style.filter = 'blur(' + num + 'px)';
       window.StorageManager.saveSettings(this.settings);
     },
 

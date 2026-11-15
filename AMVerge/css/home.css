@@ -295,7 +295,8 @@
   border-bottom: none;
 }
 
-/* The frosted background lives on a pseudo-element rather than on the pane.*/
+/* Solid dark backing without backdrop-filter: blurring a live background <video>
+   behind #previewVideo causes CEF (GL disabled) to tear/flicker video frames. */
 .right-pane::before {
   content: '';
   position: absolute;
@@ -304,9 +305,7 @@
   bottom: 0;
   left: 0;
   z-index: 0;
-  background: rgba(14, 14, 14, 0.85);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  background: rgba(14, 14, 14, 0.92);
   pointer-events: none;
 }
 
@@ -474,7 +473,7 @@
   cursor: pointer;
   border: 1px solid rgba(255, 255, 255, 0.1);
   contain: layout paint;
-  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out, border-color 0.15s ease-out;
+  transition: transform 0.14s ease-out, border-color 0.14s ease-out;
 }
 
 .clip-hover-video {
@@ -516,6 +515,50 @@
   display: block;
 }
 
+.clip-wrapper.is-pending-reencode {
+  border-style: dashed;
+  border-color: rgba(245, 158, 11, 0.55);
+}
+
+.clip-wrapper.is-pending-reencode .clip-thumb {
+  filter: saturate(0.55) brightness(0.62);
+}
+
+.clip-pending-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(18, 14, 6, 0.88);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: #fbbf24;
+  font-family: Calibri, "Segoe UI", sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.clip-pending-spinner {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid rgba(251, 191, 36, 0.25);
+  border-top-color: #fbbf24;
+  border-radius: 50%;
+  animation: clipPendingSpin 0.9s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes clipPendingSpin {
+  to { transform: rotate(360deg); }
+}
+
 .clip-overlay {
   position: absolute;
   bottom: 0;
@@ -529,6 +572,7 @@
   justify-content: flex-end;
   align-items: center;
   pointer-events: none;
+  z-index: 3;
 }
 .clip-time {
   font-family: var(--font-mono);
@@ -545,13 +589,11 @@
   height: 18px;
   border-radius: var(--radius-sm);
   border: 1px solid rgba(255, 255, 255, 0.4);
-  background: rgba(0, 0, 0, 0.65);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.72);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all var(--transition);
+  transition: border-color var(--transition), background var(--transition);
   z-index: 5;
 }
 .clip-wrapper:hover .clip-selection {
@@ -605,7 +647,7 @@
   justify-content: center;
   position: relative;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
-  transition: all 0.25s ease;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
 .preview-window:hover {
@@ -690,14 +732,24 @@
   height: 100%;
   overflow: hidden;
   border-radius: var(--radius);
+  background: #000;
 }
 
 .video-frame > video {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.video-frame > .preview-canvas {
   width: 100%;
   height: 100%;
-  object-fit: contain;
   display: block;
   cursor: pointer;
+  background: #000;
 }
 
 /* revealed on hover so the scene itself is unobstructed at rest */
@@ -711,9 +763,7 @@
   padding: 0 0.6rem;
   opacity: 0;
   transition: opacity 0.3s ease;
-  background: rgb(60 60 60 / 0.4);
-  -webkit-backdrop-filter: blur(2px);
-  backdrop-filter: blur(2px);
+  background: rgb(20 20 20 / 0.72);
   pointer-events: none;
 }
 
@@ -799,9 +849,7 @@
   width: 1.3rem;
   height: 5.5rem;
   border-radius: 20px;
-  background: rgb(20 20 20 / 0.72);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
+  background: rgba(18, 18, 18, 0.94);
   border: 1px solid rgb(var(--accent-rgb) / 0.35);
   opacity: 0;
   visibility: hidden;

@@ -91,6 +91,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "${{ github.ref_name }}"
-          $flags = @("--generate-notes", "--title", "AMVerge Extension $env:VERSION")
+          $flags = @("--notes", "", "--title", "AMVerge Extension $env:VERSION")
           if ($tag.Contains("-")) { $flags += "--prerelease" } else { $flags += "--latest" }
           gh release create $tag (Get-ChildItem release).FullName @flags

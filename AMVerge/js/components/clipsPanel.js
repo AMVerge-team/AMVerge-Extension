@@ -9,6 +9,26 @@
 
     init: function (app) {
       this.app = app;
+      this._bindScrollPerf();
+    },
+
+    _isScrolling: false,
+
+    _bindScrollPerf: function () {
+      var grid = document.getElementById('clipsGrid');
+      var scroller = grid ? grid.parentElement : null;
+      if (!scroller || scroller._amvScrollBound) return;
+      scroller._amvScrollBound = true;
+      var s = this;
+      var timer = null;
+      scroller.addEventListener('scroll', function () {
+        s._isScrolling = true;
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(function () {
+          timer = null;
+          s._isScrolling = false;
+        }, 120);
+      }, { passive: true });
     },
 
     onSelectionChange: function (cb) {
@@ -49,6 +69,7 @@
     },
 
     _releaseVideos: function (root) {
+      this._stopSharedHover();
       if (!root) return;
       var videos = root.querySelectorAll('video');
       for (var i = 0; i < videos.length; i++) {
@@ -60,9 +81,45 @@
       }
     },
 
+    _hoverVid: null,
+    _hoverRvfc: null,
+    _hoverOwner: null,
+
+    _getHoverVideo: function () {
+      if (this._hoverVid) return this._hoverVid;
+      var v = document.createElement('video');
+      v.muted = true;
+      v.loop = true;
+      v.playsInline = true;
+      v.preload = 'auto';
+      v.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-1;';
+      document.body.appendChild(v);
+      this._hoverVid = v;
+      return v;
+    },
+
+    _stopSharedHover: function (owner) {
+      if (owner && this._hoverOwner && this._hoverOwner !== owner) return;
+      var v = this._hoverVid;
+      if (v) {
+        if (this._hoverRvfc !== null && typeof v.cancelVideoFrameCallback === 'function') {
+          try { v.cancelVideoFrameCallback(this._hoverRvfc); } catch (e) {}
+        }
+        this._hoverRvfc = null;
+        try { v.pause(); } catch (e) {}
+      }
+      if (this._hoverOwner && this._hoverOwner.canvas) {
+        var c = this._hoverOwner.canvas;
+        if (c.parentNode) c.parentNode.removeChild(c);
+        this._hoverOwner.canvas = null;
+      }
+      this._hoverOwner = null;
+    },
+
     render: function () {
       var grid = document.getElementById('clipsGrid');
       if (!grid) return;
+      this._bindScrollPerf();
       this._releaseVideos(grid);
       grid.innerHTML = '';
       grid.className = 'clips-grid density-' + this._density;
@@ -78,8 +135,7 @@
         var idx = s.scene_index !== undefined ? s.scene_index : i;
 
         var wrapper = document.createElement('div');
-        wrapper.className = 'clip-wrapper clip-appear';
-        wrapper.style.setProperty('--appear-delay', Math.min(i * 30, 600) + 'ms');
+        wrapper.className = 'clip-wrapper';
         wrapper.dataset.index = idx;
 
         if (idx === this._focusedIdx) {
@@ -103,30 +159,11 @@
           img.style.display = 'none';
         }
 
-        // Lazy hover video player. Silent on purpose: a grid of tiles that
-        // each start talking when the pointer crosses them is unusable.
         var clipPath = s.clip_path || s.path || '';
-        var hoverVideo = null;
-        if (clipPath) {
-          hoverVideo = document.createElement('video');
-          hoverVideo.className = 'clip-hover-video';
-          hoverVideo.muted = true;
-          hoverVideo.loop = true;
-          hoverVideo.playsInline = true;
-
-          if (thumb) {
-            // a still exists, so the clip is only decoded on hover
-            hoverVideo.preload = 'none';
-          } else {
-            // no still, so the video's first frame stands in for the poster
-            hoverVideo.preload = 'metadata';
-            hoverVideo.style.display = 'block';
-            (function (v, p) {
-              window.PreviewProxy.request(p, function (playable) {
-                v.src = 'file:///' + encodeURI(playable.replace(/\\/g, '/'));
-              });
-            })(hoverVideo, clipPath);
-          }
+        var isPendingReencode = !clipPath;
+        if (isPendingReencode) {
+          wrapper.classList.add('is-pending-reencode');
+          wrapper.title = 'Waiting to re-encode';
         }
 
         var overlay = document.createElement('div');
@@ -138,56 +175,102 @@
         sel.className = 'clip-selection';
 
         wrapper.appendChild(img);
-        if (hoverVideo) wrapper.appendChild(hoverVideo);
+        if (isPendingReencode) {
+          var badge = document.createElement('div');
+          badge.className = 'clip-pending-badge';
+          badge.innerHTML = '<span class="clip-pending-spinner"></span><span>Re-encode</span>';
+          wrapper.appendChild(badge);
+        }
         wrapper.appendChild(overlay);
         wrapper.appendChild(sel);
 
-        (function (w, idx, clipP, vidEl, thumb, sel) {
+        (function (w, idx, initialClipP, sel, overlayEl) {
+          var clipP = initialClipP;
           var hoverTimer = null;
           var hovering = false;
+          var ownerState = { canvas: null };
+
+          w._updateClipInPlace = function (newPath) {
+            clipP = newPath || clipP;
+            w.classList.remove('is-pending-reencode');
+            w.removeAttribute('title');
+            var b = w.querySelector('.clip-pending-badge');
+            if (b && b.parentNode) b.parentNode.removeChild(b);
+          };
+
+          var cancelHover = function () {
+            hovering = false;
+            if (hoverTimer) {
+              clearTimeout(hoverTimer);
+              hoverTimer = null;
+            }
+            ClipsPanel._stopSharedHover(ownerState);
+          };
 
           var startPlaying = function (playable) {
-            // the pointer can leave while a proxy is still building, and a tile
-            // that starts playing after that looks like it picked itself
-            if (!hovering) return;
-            if (!vidEl.src) {
-              vidEl.src = 'file:///' + encodeURI(playable.replace(/\\/g, '/'));
+            if (!hovering || ClipsPanel._isScrolling || idx === ClipsPanel._focusedIdx) return;
+            ClipsPanel._stopSharedHover();
+            var canvas = document.createElement('canvas');
+            canvas.className = 'clip-hover-video';
+            canvas.style.display = 'block';
+            w.insertBefore(canvas, overlayEl);
+            ownerState.canvas = canvas;
+            ClipsPanel._hoverOwner = ownerState;
+
+            var ctx = canvas.getContext('2d');
+            var v = ClipsPanel._getHoverVideo();
+            var rate = (ClipsPanel.app && ClipsPanel.app.settings && ClipsPanel.app.settings.gridPreviewSpeed) || 1;
+            v.playbackRate = rate;
+
+            var draw = function () {
+              if (ClipsPanel._hoverOwner !== ownerState || !ownerState.canvas) return;
+              if (v.readyState >= 2 && v.videoWidth && v.videoHeight) {
+                var cw = canvas.clientWidth || 160;
+                var ch = canvas.clientHeight || 90;
+                if (canvas.width !== cw || canvas.height !== ch) {
+                  canvas.width = cw;
+                  canvas.height = ch;
+                }
+                try { ctx.drawImage(v, 0, 0, cw, ch); } catch (e) {}
+              }
+              if (!v.paused && !v.ended && typeof v.requestVideoFrameCallback === 'function') {
+                ClipsPanel._hoverRvfc = v.requestVideoFrameCallback(draw);
+              }
+            };
+
+            var nextSrc = 'file:///' + encodeURI(playable.replace(/\\/g, '/'));
+            if (v.getAttribute('src') !== nextSrc) {
+              v.src = nextSrc;
+            } else {
+              try { v.currentTime = 0; } catch (e) {}
             }
-            vidEl.style.display = 'block';
-            var playPromise = vidEl.play();
+            if (typeof v.requestVideoFrameCallback === 'function') {
+              ClipsPanel._hoverRvfc = v.requestVideoFrameCallback(draw);
+            }
+            var playPromise = v.play();
             if (playPromise && playPromise.catch) {
               playPromise.catch(function () {});
             }
           };
 
           w.addEventListener('mouseenter', function () {
-            if (!vidEl || !clipP) return;
+            if (!clipP || ClipsPanel._isScrolling || idx === ClipsPanel._focusedIdx) return;
             hovering = true;
             hoverTimer = setTimeout(function () {
-              // keep the still up until a proxy exists, rather than paint black
+              if (!hovering || ClipsPanel._isScrolling || idx === ClipsPanel._focusedIdx) return;
               var ready = window.PreviewProxy.cached(clipP);
-              if (ready || vidEl.src) startPlaying(ready || clipP);
+              if (ready) startPlaying(ready);
               else window.PreviewProxy.request(clipP, startPlaying);
-            }, 120);
+            }, 220);
           });
 
           w.addEventListener('mouseleave', function () {
-            hovering = false;
-            if (hoverTimer) {
-              clearTimeout(hoverTimer);
-              hoverTimer = null;
-            }
-            if (vidEl) {
-              vidEl.pause();
-              // back to the first frame, which is what the tile shows at rest
-              try { vidEl.currentTime = 0; } catch (e) {}
-              // only hide it when a still is underneath to fall back to
-              if (thumb) vidEl.style.display = 'none';
-            }
+            cancelHover();
           });
 
           // same controls as the app: click focuses, dblclick/ctrl ticks, shift ranges
           w.addEventListener('click', function (e) {
+            cancelHover();
             // the corner checkbox is a direct toggle wherever it is clicked
             if (e.target === sel || sel.contains(e.target)) {
               e.stopPropagation();
@@ -212,9 +295,10 @@
           // double click ticks it for export without disturbing focus
           w.addEventListener('dblclick', function (e) {
             e.preventDefault();
+            cancelHover();
             ClipsPanel.toggleSelect(idx);
           });
-        })(wrapper, idx, clipPath, hoverVideo, thumb, sel);
+        })(wrapper, idx, clipPath, sel, overlay);
 
         return wrapper;
       }
@@ -255,7 +339,17 @@
         }
         s.clip_path = clipPath;
         s.path = clipPath;
-        this._refreshTile(idx);
+        if (clipMode) s.clip_mode = clipMode;
+        if (window.PreviewProxy && window.PreviewProxy.refresh) {
+          window.PreviewProxy.refresh([s], this.app);
+        }
+        var grid = document.getElementById('clipsGrid');
+        var existing = grid ? grid.querySelector('.clip-wrapper[data-index="' + idx + '"]') : null;
+        if (existing && existing._updateClipInPlace) {
+          existing._updateClipInPlace(clipPath);
+        } else {
+          this._refreshTile(idx);
+        }
         return;
       }
     },
@@ -269,10 +363,15 @@
 
       var img = wrapper.querySelector('.clip-thumb');
       if (!img || !img.getAttribute('src')) return;
-      // the <img> already tried this path and failed while the file did not
-      // exist, so it needs a URL the cache has not seen to try again
-      img.style.display = '';
-      img.src = img.getAttribute('src').split('?')[0] + '?t=' + Date.now();
+      // If the image already decoded cleanly, do not force a reload flash
+      if (img.complete && img.naturalWidth > 0 && img.style.display !== 'none') return;
+      var nextUrl = img.getAttribute('src').split('?')[0] + '?t=' + Date.now();
+      var pre = new Image();
+      pre.onload = function () {
+        img.src = nextUrl;
+        img.style.display = '';
+      };
+      pre.src = nextUrl;
     },
 
     /** fold the final scene list in, keeping selection and focus the user may already have set */
@@ -283,6 +382,7 @@
         byIdx[sc.scene_index !== undefined ? sc.scene_index : i] = sc;
       }
 
+      var grid = document.getElementById('clipsGrid');
       for (var j = 0; j < this._scenes.length; j++) {
         var mine = this._scenes[j];
         var idx = mine.scene_index !== undefined ? mine.scene_index : j;
@@ -290,20 +390,26 @@
         if (!theirs) continue;
 
         var clip = theirs.clip_path || theirs.path || '';
-        var changed = false;
         if (clip && clip !== mine.clip_path) {
           mine.clip_path = clip;
           mine.path = clip;
-          changed = true;
+          var existing = grid ? grid.querySelector('.clip-wrapper[data-index="' + idx + '"]') : null;
+          if (existing && existing._updateClipInPlace) {
+            existing._updateClipInPlace(clip);
+          } else {
+            this._refreshTile(idx);
+          }
         }
         if (theirs.thumbnail && theirs.thumbnail !== mine.thumbnail) {
           mine.thumbnail = theirs.thumbnail;
-          changed = true;
+          this.markThumbnail(idx);
         }
-        if (changed) this._refreshTile(idx);
       }
 
-      if (window.PreviewProxy) window.PreviewProxy.reset(this._scenes, this.app);
+      if (window.PreviewProxy) {
+        if (window.PreviewProxy.refresh) window.PreviewProxy.refresh(this._scenes, this.app);
+        else window.PreviewProxy.reset(this._scenes, this.app);
+      }
     },
 
     /** focus a clip: what you are looking at, as opposed to what gets exported */
@@ -406,13 +512,16 @@
     },
 
     _updateFocusUI: function () {
-      var items = document.querySelectorAll('.clip-wrapper');
-      for (var i = 0; i < items.length; i++) {
-        var idx = parseInt(items[i].dataset.index, 10);
-        if (idx === this._focusedIdx) {
-          items[i].classList.add('focused');
-        } else {
-          items[i].classList.remove('focused');
+      var prev = document.querySelectorAll('.clip-wrapper.focused');
+      for (var i = 0; i < prev.length; i++) {
+        if (parseInt(prev[i].dataset.index, 10) !== this._focusedIdx) {
+          prev[i].classList.remove('focused');
+        }
+      }
+      if (this._focusedIdx !== null && this._focusedIdx !== undefined) {
+        var next = document.querySelector('.clip-wrapper[data-index="' + this._focusedIdx + '"]');
+        if (next && !next.classList.contains('focused')) {
+          next.classList.add('focused');
         }
       }
     },

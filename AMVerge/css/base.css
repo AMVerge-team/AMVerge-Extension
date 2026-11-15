@@ -138,7 +138,7 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
   position: absolute;
   inset: 0;
   background: var(--bg-gradient);
-  mix-blend-mode: multiply;
+  opacity: 0.55;
   pointer-events: none;
 }
 
@@ -191,9 +191,7 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
   flex-direction: column;
   justify-content: space-between;
   border-right: 1px solid var(--border);
-  background: rgba(10, 10, 10, 0.75);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  background: rgba(10, 10, 10, 0.88);
   z-index: 20;
 }
 
@@ -421,9 +419,7 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
   font-size: var(--text-sm);
   font-weight: 400;
   border: 1px solid var(--border-strong);
-  background: rgba(15, 0, 0, 0.2);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
+  background: rgba(18, 12, 12, 0.78);
   color: var(--text);
   border-radius: var(--radius);
   cursor: pointer;
@@ -431,7 +427,7 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
   align-items: center;
   justify-content: center;
   gap: 6px;
-  transition: all var(--transition);
+  transition: border-color var(--transition), background var(--transition), color var(--transition), box-shadow var(--transition);
   line-height: 1;
   white-space: nowrap;
 }
@@ -515,7 +511,6 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
 body,
 h1, h2, h3, h4, h5, h6,
 button,
-.mode-card-title,
 .setup-subtitle {
   font-weight: 400;
 }

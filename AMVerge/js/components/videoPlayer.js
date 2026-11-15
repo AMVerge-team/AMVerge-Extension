@@ -30,6 +30,8 @@
     _lastVolume: FALLBACK_VOLUME,
     /** false until the user unmutes; clips start silent otherwise */
     _userUnmuted: false,
+    _rvfcId: null,
+    _rafId: null,
 
     init: function () {
       this.wrapper = document.getElementById('previewPlayer');
@@ -46,6 +48,18 @@
       this.fullscreenBtn = document.getElementById('pvFullscreenBtn');
       this.frame = this.wrapper.querySelector('.video-frame');
 
+      // Render video frames through a 2D <canvas> so CEF/Chromium 99 never
+      // promotes <video> to a Windows DirectComposition hardware overlay plane
+      // (which flickers for the first ~2s inside After Effects child HWNDs).
+      this.canvas = document.getElementById('previewCanvas');
+      if (!this.canvas && this.frame) {
+        this.canvas = document.createElement('canvas');
+        this.canvas.id = 'previewCanvas';
+        this.canvas.className = 'preview-canvas';
+        this.frame.insertBefore(this.canvas, this.video.nextSibling);
+      }
+      this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
+
       this._bind();
       this._applyVolumeFill(1);
     },
@@ -55,9 +69,32 @@
 
       this.playBtn.addEventListener('click', function () { s.togglePlay(); });
       this.video.addEventListener('click', function () { s.togglePlay(); });
+      if (this.canvas) {
+        this.canvas.addEventListener('click', function () { s.togglePlay(); });
+      }
 
-      this.video.addEventListener('play', function () { setIcon(s.playBtn, 'icon-pause'); });
-      this.video.addEventListener('pause', function () { setIcon(s.playBtn, 'icon-play'); });
+      this.video.addEventListener('play', function () {
+        setIcon(s.playBtn, 'icon-pause');
+        s._startFrameLoop();
+      });
+      this.video.addEventListener('playing', function () {
+        s._drawFrame();
+        s._startFrameLoop();
+      });
+      this.video.addEventListener('pause', function () {
+        setIcon(s.playBtn, 'icon-play');
+        s._stopFrameLoop();
+        s._drawFrame();
+      });
+      this.video.addEventListener('ended', function () {
+        s._stopFrameLoop();
+      });
+      this.video.addEventListener('loadeddata', function () {
+        s._drawFrame();
+      });
+      this.video.addEventListener('seeked', function () {
+        s._drawFrame();
+      });
 
       this.video.addEventListener('loadedmetadata', function () {
         s._syncProgressRange();
@@ -132,11 +169,10 @@
       this._range = range || null;
 
       this.wrapper.style.display = '';
-      // reloading the same source would otherwise restart it needlessly when
-      // stepping between two scenes of one episode
+      // assigning src already kicks off media loading; an extra load() call resets
+      // the CEF video surface a second time and flashes the frame under it
       if (this.video.getAttribute('src') !== fileUrl) {
         this.video.src = fileUrl;
-        this.video.load();
       }
 
       // muted by default: clips are skimmed rapidly and a scene bursting into
@@ -192,13 +228,86 @@
      * piles up players until playback stops working entirely.
      */
     clear: function () {
+      this._stopFrameLoop();
       this.wrapper.style.display = 'none';
       try {
         this.video.pause();
         this.video.removeAttribute('src');
         this.video.load();
       } catch (e) {}
+      if (this.canvas && this.ctx) {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      }
       setIcon(this.playBtn, 'icon-play');
+    },
+
+    _drawFrame: function () {
+      if (!this.canvas || !this.ctx || !this.video) return;
+      if (this.video.readyState < 2) return;
+      var vw = this.video.videoWidth;
+      var vh = this.video.videoHeight;
+      if (!vw || !vh) return;
+
+      var cw = this.canvas.clientWidth || vw;
+      var ch = this.canvas.clientHeight || vh;
+      var dpr = window.devicePixelRatio || 1;
+      var tw = Math.max(1, Math.round(cw * dpr));
+      var th = Math.max(1, Math.round(ch * dpr));
+
+      if (this.canvas.width !== tw || this.canvas.height !== th) {
+        this.canvas.width = tw;
+        this.canvas.height = th;
+      }
+
+      var scale = Math.min(tw / vw, th / vh);
+      var dw = Math.round(vw * scale);
+      var dh = Math.round(vh * scale);
+      var dx = Math.round((tw - dw) * 0.5);
+      var dy = Math.round((th - dh) * 0.5);
+
+      this.ctx.fillStyle = '#000';
+      if (dx > 0 || dy > 0) {
+        this.ctx.fillRect(0, 0, tw, th);
+      }
+      try {
+        this.ctx.drawImage(this.video, dx, dy, dw, dh);
+      } catch (e) {}
+    },
+
+    _startFrameLoop: function () {
+      var s = this;
+      this._stopFrameLoop();
+
+      if (typeof this.video.requestVideoFrameCallback === 'function') {
+        var onVfc = function () {
+          s._rvfcId = null;
+          s._drawFrame();
+          if (s.video && !s.video.paused && !s.video.ended) {
+            s._rvfcId = s.video.requestVideoFrameCallback(onVfc);
+          }
+        };
+        this._rvfcId = this.video.requestVideoFrameCallback(onVfc);
+      } else {
+        var onRaf = function () {
+          s._rafId = null;
+          s._drawFrame();
+          if (s.video && !s.video.paused && !s.video.ended) {
+            s._rafId = window.requestAnimationFrame(onRaf);
+          }
+        };
+        this._rafId = window.requestAnimationFrame(onRaf);
+      }
+    },
+
+    _stopFrameLoop: function () {
+      if (this._rvfcId !== null && this.video && typeof this.video.cancelVideoFrameCallback === 'function') {
+        try { this.video.cancelVideoFrameCallback(this._rvfcId); } catch (e) {}
+      }
+      this._rvfcId = null;
+      if (this._rafId !== null) {
+        window.cancelAnimationFrame(this._rafId);
+        this._rafId = null;
+      }
     },
 
     /** show or hide the "preparing" state while a proxy is being built.

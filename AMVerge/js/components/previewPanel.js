@@ -1,6 +1,7 @@
 (function () {
   var PreviewPanel = {
     _currentScene: null,
+    _busyTimer: null,
 
     init: function (app) {
       this.app = app;
@@ -33,6 +34,11 @@
         clipPath = '';
       }
 
+      if (this._busyTimer !== null) {
+        clearTimeout(this._busyTimer);
+        this._busyTimer = null;
+      }
+
       if (clipPath) {
         var self = this;
 
@@ -40,6 +46,10 @@
           // a later click can land while the proxy is still building, so the
           // result is dropped unless this is still the scene on screen
           if (self._currentScene !== scene) return;
+          if (self._busyTimer !== null) {
+            clearTimeout(self._busyTimer);
+            self._busyTimer = null;
+          }
           var fileUrl = 'file:///' + encodeURI(finalPath.replace(/\\/g, '/'));
           dbg('info', 'Preview', 'Loading ' + fileUrl +
               (range ? ' @ ' + range.start + '-' + range.end : ''));
@@ -50,12 +60,17 @@
         this.empty.style.display = 'none';
 
         // usually already built, in which case this plays without a spinner.
-        // the spinner is only for the clip that outruns the background queue
+        // debounce the busy overlay by 180ms so fast probes don't flash it
         var ready = window.PreviewProxy ? window.PreviewProxy.cached(clipPath) : clipPath;
         if (ready) {
           play(ready);
         } else {
-          window.VideoPlayer.setBusy(true);
+          this._busyTimer = setTimeout(function () {
+            self._busyTimer = null;
+            if (self._currentScene === scene) {
+              window.VideoPlayer.setBusy(true);
+            }
+          }, 180);
           window.PreviewProxy.request(clipPath, play, true);
         }
       } else {
