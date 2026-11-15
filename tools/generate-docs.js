@@ -32,7 +32,7 @@ const ROOT_README = `<h1 align="center">
 
 **AMVerge** is a free After Effects CEP extension that detects scene boundaries in video files and imports the detected clips directly into your composition as layers. It uses the \`amverge\` CLI backend for fast, lossless scene detection.
 
-> **Compatibility:** Supports After Effects CC 2017 through CC 2026+ (v15.0+). Windows only.
+> **Compatibility:** Supports After Effects CC 2018 through CC 2026+ (v15.0+). Windows only.
 
 ---
 
@@ -49,13 +49,13 @@ const ROOT_README = `<h1 align="center">
 ## Installation
 
 ### Method 1: ZXP Installer (Easiest)
-1. Pick your After Effects version folder (AE2018 / AE2020 / AE2022).
+1. Download \`AMVerge.zxp\` from the latest release.
 2. Download [ZXP Installer](https://aescripts.com/learn/post/zxp-installer).
-3. Drag \`AMVerge_AE2020.zxp\` onto the ZXP Installer window.
+3. Drag \`AMVerge.zxp\` onto the ZXP Installer window.
 4. Restart After Effects, go to \`Window > Extensions > AMVerge\`.
 
 ### Method 2: Windows Setup Wizard (.exe)
-1. Run \`AMVergeSetup_AE2020.exe\` from your version folder.
+1. Run \`AMVergeSetup.exe\` (works on After Effects CC 2018+).
 2. Follow the setup wizard.
 
 ### Method 3: Manual Folder Installation
@@ -68,7 +68,7 @@ const ROOT_README = `<h1 align="center">
 ## Building from Source
 \`\`\`bash
 cd tools && npm install
-cd .. && npm run build:all
+cd .. && npm run build
 \`\`\`
 
 ---
@@ -85,52 +85,53 @@ ${EXTENSION_NAME.toUpperCase()} AFTER EFFECTS EXTENSION - COMPLETE INSTALLATION 
 
 ${GENERAL_INFO}
 
-Each version folder (AE2018 / AE2020 / AE2022) contains:
- - AMVerge/           Unpacked extension files
- - AMVerge_AEXXXX.zxp Signed ZXP package
- - AMVergeSetup_AEXXXX.exe Windows setup wizard
+The universal dist folder (After Effects CC 2018+ / v15.0+) contains:
+ - AMVerge/             Unpacked extension files
+ - AMVerge.zxp          Signed ZXP package
+ - AMVergeSetup.exe     Windows setup wizard
  - Install-Windows.bat  One-click batch installer (copies files + enables debug mode)
-
-Root-level helper files (version-agnostic):
- - Add-Keys.reg         Double-click to enable PlayerDebugMode (CSXS.9-13)
- - Add-Keys.bat         Run as admin to enable PlayerDebugMode (CSXS.9-13)
+ - Add-Keys.reg         Double-click to enable PlayerDebugMode (CSXS.8-15)
+ - Add-Keys.bat         Run as admin to enable PlayerDebugMode (CSXS.8-15)
 
 --------------------------------------------------------------------------------
 METHOD 1: ZXP INSTALLATION (Easiest & Most Recommended)
 --------------------------------------------------------------------------------
-1. Open your After Effects version folder (AE2018 / AE2020 / AE2022).
+1. Download "AMVerge.zxp" from the latest release.
 2. Download the free ZXP Installer utility:
    --> https://aescripts.com/learn/post/zxp-installer (Windows & macOS)
 3. Launch ZXP Installer.
-4. Drag "AMVerge_AEXXXX.zxp" into the ZXP Installer window.
+4. Drag "AMVerge.zxp" into the ZXP Installer window.
 5. Restart After Effects.
 6. Open the extension from: Window > Extensions > ${EXTENSION_NAME}.
 
 --------------------------------------------------------------------------------
 METHOD 2: WINDOWS SETUP WIZARD (.exe Installer)
 --------------------------------------------------------------------------------
-1. Open your version folder and run "AMVergeSetup_AEXXXX.exe".
+1. Run "AMVergeSetup.exe".
 2. Follow the setup wizard instructions.
-3. The installer handles file placement and registry configuration.
+3. The installer handles file placement and registry configuration for AE 2018+.
 4. Open After Effects, go to: Window > Extensions > ${EXTENSION_NAME}.
 
 --------------------------------------------------------------------------------
 METHOD 3: MANUAL FOLDER INSTALLATION
 --------------------------------------------------------------------------------
-1. Copy the "AMVerge" folder from your desired version folder to the Adobe CEP extensions dir:
+1. Copy the "AMVerge" folder to the Adobe CEP extensions dir:
   - Windows: C:\\Program Files (x86)\\Common Files\\Adobe\\CEP\\extensions\\${EXTENSION_NAME}\\
 
 2. Enable PlayerDebugMode (so Adobe loads unsigned extensions):
    Choose one of the following:
   - Double-click "Add-Keys.reg" (recommended, one-click)
   - Run "Add-Keys.bat" as administrator
-  - Run "Install-Windows.bat" from your version folder (copies files + keys in one step)
+  - Run "Install-Windows.bat" (copies files + keys in one step)
   - Or add the keys manually (Command Prompt as Admin):
+      reg add "HKCU\\Software\\Adobe\\CSXS.8" /v PlayerDebugMode /t REG_SZ /d 1 /f
       reg add "HKCU\\Software\\Adobe\\CSXS.9" /v PlayerDebugMode /t REG_SZ /d 1 /f
       reg add "HKCU\\Software\\Adobe\\CSXS.10" /v PlayerDebugMode /t REG_SZ /d 1 /f
       reg add "HKCU\\Software\\Adobe\\CSXS.11" /v PlayerDebugMode /t REG_SZ /d 1 /f
       reg add "HKCU\\Software\\Adobe\\CSXS.12" /v PlayerDebugMode /t REG_SZ /d 1 /f
       reg add "HKCU\\Software\\Adobe\\CSXS.13" /v PlayerDebugMode /t REG_SZ /d 1 /f
+      reg add "HKCU\\Software\\Adobe\\CSXS.14" /v PlayerDebugMode /t REG_SZ /d 1 /f
+      reg add "HKCU\\Software\\Adobe\\CSXS.15" /v PlayerDebugMode /t REG_SZ /d 1 /f
 
 3. Restart After Effects and launch via: Window > Extensions > ${EXTENSION_NAME}.
 ================================================================================
@@ -147,14 +148,14 @@ PRODUCT INFORMATION
 - **Extension Bundle ID:** ${BUNDLE_ID}
 - **Extension Type:** After Effects CEP Panel
 - **Required Run Time:** CSXS 6.0 or newer
-- **Host Compatibility:** Adobe After Effects CC 2017 (14.0) to CC 2026+ (99.9)
+- **Host Compatibility:** Adobe After Effects CC 2018 (15.0) to CC 2026+ (99.9)
 
 ================================================================================
 INSTALLATION TEXT FOR CUSTOMERS
 ================================================================================
 To install the ${EXTENSION_NAME} extension:
 1. Download and run the aescripts + aeplugins manager app OR the ZXP Installer.
-2. Pick your AE version, drag the ZXP package onto the installer.
+2. Drag AMVerge.zxp onto the installer.
 3. Restart After Effects and launch the extension from Window > Extensions > ${EXTENSION_NAME}.
 
 Refer to the guide: https://aescripts.com/learn/post/zxp-installer
@@ -162,8 +163,11 @@ Refer to the guide: https://aescripts.com/learn/post/zxp-installer
 
 const REG_KEYS = `Windows Registry Editor Version 5.00
 
-; Enable PlayerDebugMode for After Effects CEP extensions (CSXS.9 - CSXS.13)
+; Enable PlayerDebugMode for After Effects CEP extensions (CSXS.8 - CSXS.15)
 ; Double-click this file and confirm to add the keys, then restart After Effects.
+
+[HKEY_CURRENT_USER\\Software\\Adobe\\CSXS.8]
+"PlayerDebugMode"="1"
 
 [HKEY_CURRENT_USER\\Software\\Adobe\\CSXS.9]
 "PlayerDebugMode"="1"
@@ -179,17 +183,26 @@ const REG_KEYS = `Windows Registry Editor Version 5.00
 
 [HKEY_CURRENT_USER\\Software\\Adobe\\CSXS.13]
 "PlayerDebugMode"="1"
+
+[HKEY_CURRENT_USER\\Software\\Adobe\\CSXS.14]
+"PlayerDebugMode"="1"
+
+[HKEY_CURRENT_USER\\Software\\Adobe\\CSXS.15]
+"PlayerDebugMode"="1"
 `;
 
 const REG_BAT = `@echo off
-:: Enable PlayerDebugMode for After Effects CEP extensions (CSXS.9 - CSXS.13)
+:: Enable PlayerDebugMode for After Effects CEP extensions (CSXS.8 - CSXS.15)
 :: Right-click and "Run as administrator", then restart After Effects.
 
+reg add "HKCU\\Software\\Adobe\\CSXS.8" /v PlayerDebugMode /t REG_SZ /d 1 /f
 reg add "HKCU\\Software\\Adobe\\CSXS.9" /v PlayerDebugMode /t REG_SZ /d 1 /f
 reg add "HKCU\\Software\\Adobe\\CSXS.10" /v PlayerDebugMode /t REG_SZ /d 1 /f
 reg add "HKCU\\Software\\Adobe\\CSXS.11" /v PlayerDebugMode /t REG_SZ /d 1 /f
 reg add "HKCU\\Software\\Adobe\\CSXS.12" /v PlayerDebugMode /t REG_SZ /d 1 /f
 reg add "HKCU\\Software\\Adobe\\CSXS.13" /v PlayerDebugMode /t REG_SZ /d 1 /f
+reg add "HKCU\\Software\\Adobe\\CSXS.14" /v PlayerDebugMode /t REG_SZ /d 1 /f
+reg add "HKCU\\Software\\Adobe\\CSXS.15" /v PlayerDebugMode /t REG_SZ /d 1 /f
 
 echo.
 echo PlayerDebugMode keys added successfully.

@@ -4,11 +4,8 @@
   "description": "Build tooling for AMVerge AE Extension",
   "private": true,
   "scripts": {
-    "build": "node build.js --target=2020",
-    "build:2018": "node build.js --target=2018",
-    "build:2020": "node build.js --target=2020",
-    "build:2022": "node build.js --target=2022",
-    "build:all": "node build.js --target=2018 && node build.js --target=2020 && node build.js --target=2022 && node generate-docs.js",
+    "build": "node build.js",
+    "build:all": "node build.js && node generate-docs.js",
     "docs": "node generate-docs.js"
   },
   "devDependencies": {

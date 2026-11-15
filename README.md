@@ -13,7 +13,7 @@
 
 **AMVerge** is a free After Effects CEP extension that detects scene boundaries in video files and imports the detected clips directly into your composition as layers. It uses the `amverge` CLI backend for fast, lossless scene detection.
 
-> **Compatibility:** Supports After Effects CC 2017 through CC 2026+ (v15.0+). Windows only.
+> **Compatibility:** Supports After Effects CC 2018 through CC 2026+ (v15.0+). Windows only.
 
 ---
 
@@ -30,13 +30,13 @@
 ## Installation
 
 ### Method 1: ZXP Installer (Easiest)
-1. Pick your After Effects version folder (AE2018 / AE2020 / AE2022).
+1. Download `AMVerge.zxp` from the latest release.
 2. Download [ZXP Installer](https://aescripts.com/learn/post/zxp-installer).
-3. Drag `AMVerge_AE2020.zxp` onto the ZXP Installer window.
+3. Drag `AMVerge.zxp` onto the ZXP Installer window.
 4. Restart After Effects, go to `Window > Extensions > AMVerge`.
 
 ### Method 2: Windows Setup Wizard (.exe)
-1. Run `AMVergeSetup_AE2020.exe` from your version folder.
+1. Run `AMVergeSetup.exe` (works on After Effects CC 2018+).
 2. Follow the setup wizard.
 
 ### Method 3: Manual Folder Installation
@@ -49,7 +49,7 @@
 ## Building from Source
 ```bash
 cd tools && npm install
-cd .. && npm run build:all
+cd .. && npm run build
 ```
 
 ---

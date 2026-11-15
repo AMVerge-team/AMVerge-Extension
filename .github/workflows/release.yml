@@ -70,23 +70,17 @@ jobs:
       - name: Stage uv for every platform
         run: node tools/fetch-uv.js --all
 
-      - name: Build AE2018
-        run: node tools/build.js --target=2018
-
-      - name: Build AE2020
-        run: node tools/build.js --target=2020
-
-      - name: Build AE2022
-        run: node tools/build.js --target=2022
+      - name: Build universal AE 2018+ installer & ZXP
+        run: node tools/build.js
 
       - name: Collect release files
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force release | Out-Null
-          $files = Get-ChildItem dist -Recurse -Include "AMVergeSetup_*.exe", "AMVerge_*.zxp"
-          if ($files.Count -lt 6) {
-            $files | ForEach-Object { $_.FullName }
-            throw "Expected 3 installers and 3 zxp packages, found $($files.Count)"
+          $files = Get-ChildItem "dist\*" -File -Include "AMVergeSetup.exe", "AMVerge.zxp"
+          if ($files.Count -lt 2) {
+            Get-ChildItem dist -Recurse | ForEach-Object { $_.FullName }
+            throw "Expected universal AMVergeSetup.exe and AMVerge.zxp, found $($files.Count)"
           }
           $files | Copy-Item -Destination release
           Get-ChildItem release

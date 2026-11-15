@@ -4,38 +4,16 @@ const JavaScriptObfuscator = require('javascript-obfuscator');
 const jsxbin = require('jsxbin');
 const zxpSignCmd = require('zxp-sign-cmd');
 
-const VERSION_PROFILES = {
-    '2018': {
-        label: 'AE2018',
-        hostVersion: '[13.5,20.0]',
-        csxsVersion: '6.0',
-        description: 'After Effects CC 2017-2018 (v15.x)'
-    },
-    '2020': {
-        label: 'AE2020',
-        hostVersion: '[16.0,18.9]',
-        csxsVersion: '8.0',
-        description: 'After Effects CC 2019-2021 (v16.x-v18.x)'
-    },
-    '2022': {
-        label: 'AE2022',
-        hostVersion: '[22.0,99.9]',
-        csxsVersion: '10.0',
-        description: 'After Effects CC 2022+ (v22.x+)'
-    }
+const UNIVERSAL_PROFILE = {
+    label: 'AE2018+',
+    hostVersion: '[15.0,99.9]',
+    csxsVersion: '6.0',
+    description: 'After Effects CC 2018+ (v15.0+)'
 };
 
-const targetArg = process.argv.find(a => a.startsWith('--target='));
-const TARGET = targetArg ? targetArg.split('=')[1] : '2020';
-const PROFILE = VERSION_PROFILES[TARGET];
-
-if (!PROFILE) {
-    console.error(`Unknown target: ${TARGET}. Valid targets: ${Object.keys(VERSION_PROFILES).join(', ')}`);
-    process.exit(1);
-}
-
 const SRC_DIR = path.join(__dirname, '..', 'AMVerge');
-const DIST_DIR = path.join(__dirname, '..', 'dist', PROFILE.label, 'AMVerge');
+const OUT_DIR = path.join(__dirname, '..', 'dist');
+const DIST_DIR = path.join(OUT_DIR, 'AMVerge');
 const EXTENSION_NAME = 'AMVerge';
 const BUNDLE_ID = 'com.amverge.extension';
 const CERT_PASSWORD = 'amverge_extension_pass';
@@ -76,7 +54,7 @@ function getFiles(dir, extension, files_) {
 }
 
 async function runBuild() {
-    console.log('Starting ' + EXTENSION_NAME + ' ' + PROFILE.label + ' Build (' + PROFILE.description + ')...');
+    console.log('Starting ' + EXTENSION_NAME + ' Universal Build (' + UNIVERSAL_PROFILE.description + ')...');
 
     if (fs.existsSync(DIST_DIR)) {
         console.log('Cleaning existing dist directory...');
@@ -85,12 +63,6 @@ async function runBuild() {
 
     console.log('Copying files to dist...');
     copyFolderSync(SRC_DIR, DIST_DIR);
-
-    const compatDir = path.join(__dirname, 'compat', TARGET);
-    if (fs.existsSync(compatDir)) {
-        console.log('Applying compatibility overlay for ' + PROFILE.label + ' (' + TARGET + ')...');
-        copyFolderSync(compatDir, DIST_DIR);
-    }
 
     console.log('Obfuscating JavaScript files...');
     const jsFiles = getFiles(DIST_DIR, '.js');
@@ -154,7 +126,7 @@ async function runBuild() {
     var jsxCompiled = fs.existsSync(jsxbinPath);
     var manifestPath = path.join(DIST_DIR, 'CSXS', 'manifest.xml');
     if (fs.existsSync(manifestPath)) {
-        console.log('Patching manifest.xml for ' + PROFILE.label + '...');
+        console.log('Patching manifest.xml for ' + UNIVERSAL_PROFILE.label + '...');
         let manifestContent = fs.readFileSync(manifestPath, 'utf8');
 
         manifestContent = manifestContent.replace(
@@ -164,31 +136,30 @@ async function runBuild() {
 
         manifestContent = manifestContent.replace(
             /<Host Name="AEFT" Version="[^"]*"/g,
-            '<Host Name="AEFT" Version="' + PROFILE.hostVersion + '"'
+            '<Host Name="AEFT" Version="' + UNIVERSAL_PROFILE.hostVersion + '"'
         );
 
         manifestContent = manifestContent.replace(
             /<RequiredRuntime Name="CSXS" Version="[^"]*"/g,
-            '<RequiredRuntime Name="CSXS" Version="' + PROFILE.csxsVersion + '"'
+            '<RequiredRuntime Name="CSXS" Version="' + UNIVERSAL_PROFILE.csxsVersion + '"'
         );
 
         fs.writeFileSync(manifestPath, manifestContent, 'utf8');
-        console.log(' - Host: ' + PROFILE.hostVersion + ', CSXS: ' + PROFILE.csxsVersion);
+        console.log(' - Host: ' + UNIVERSAL_PROFILE.hostVersion + ', CSXS: ' + UNIVERSAL_PROFILE.csxsVersion);
     } else {
         console.error('manifest.xml not found!');
     }
 
     console.log('');
-    console.log('Build process completed! Extension files in "dist/' + PROFILE.label + '/' + EXTENSION_NAME + '".');
+    console.log('Build process completed! Extension files in "dist/' + EXTENSION_NAME + '".');
 
     console.log('');
     console.log('Packaging and signing ZXP...');
     const certPath = path.join(__dirname, 'cert.p12');
-    const versionDir = path.join(__dirname, '..', 'dist', PROFILE.label);
-    const zxpOutputPath = path.join(versionDir, EXTENSION_NAME + '_' + PROFILE.label + '.zxp');
+    const zxpOutputPath = path.join(OUT_DIR, EXTENSION_NAME + '.zxp');
 
-    if (!fs.existsSync(versionDir)) {
-        fs.mkdirSync(versionDir, { recursive: true });
+    if (!fs.existsSync(OUT_DIR)) {
+        fs.mkdirSync(OUT_DIR, { recursive: true });
     }
 
     try {
@@ -219,7 +190,7 @@ async function runBuild() {
             cert: certPath,
             password: CERT_PASSWORD
         });
-        console.log('Signed package: dist/' + PROFILE.label + '/' + EXTENSION_NAME + '_' + PROFILE.label + '.zxp');
+        console.log('Signed package: dist/' + EXTENSION_NAME + '.zxp');
     } catch (signErr) {
         console.error('Failed to package and sign ZXP: ' + signErr.message);
         console.log('     The extension folder is still available in dist/ for manual packaging.');
@@ -255,12 +226,12 @@ async function runBuild() {
         try {
             console.log(' - Compiling installer script...');
             const issPath = path.join(__dirname, 'installer.iss');
-            const outputName = EXTENSION_NAME + 'Setup_' + PROFILE.label;
+            const outputName = EXTENSION_NAME + 'Setup';
             // the installer's version comes from the manifest, the one place a release bumps
             const manifestXml = fs.readFileSync(path.join(SRC_DIR, 'CSXS', 'manifest.xml'), 'utf8');
             const versionMatch = manifestXml.match(/ExtensionBundleVersion="([^"]+)"/);
             const appVer = versionMatch ? versionMatch[1] : '1.0.0';
-            const args = ' /DSourcePath="' + DIST_DIR + '" /DOutputDir="' + versionDir + '" /DOutputName="' + outputName + '" /DAppVer="' + appVer + '" "' + issPath + '"';
+            const args = ' /DSourcePath="' + DIST_DIR + '" /DOutputDir="' + OUT_DIR + '" /DOutputName="' + outputName + '" /DAppVer="' + appVer + '" "' + issPath + '"';
             const cmd = (isccPath === 'iscc' ? 'iscc' : '"' + isccPath + '"') + args;
             execSync(cmd, { stdio: 'inherit' });
             console.log('Successfully compiled installer EXE!');
@@ -272,7 +243,7 @@ async function runBuild() {
         console.log('     Please compile tools/installer.iss manually using Inno Setup on Windows to create the EXE.');
     }
 
-    const batPath = path.join(versionDir, 'Install-Windows.bat');
+    const batPath = path.join(OUT_DIR, 'Install-Windows.bat');
     console.log('');
     console.log('Generating Windows batch installer...');
     fs.writeFileSync(batPath, [
@@ -325,6 +296,8 @@ async function runBuild() {
         'reg add "HKCU\\Software\\Adobe\\CSXS.11" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul',
         'reg add "HKCU\\Software\\Adobe\\CSXS.12" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul',
         'reg add "HKCU\\Software\\Adobe\\CSXS.13" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul',
+        'reg add "HKCU\\Software\\Adobe\\CSXS.14" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul',
+        'reg add "HKCU\\Software\\Adobe\\CSXS.15" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul',
         '',
         'echo [3/3] Finalizing installation...',
         'echo.',
@@ -338,7 +311,7 @@ async function runBuild() {
     console.log(' - Generated batch installer');
 
     console.log('');
-    console.log(EXTENSION_NAME + ' ' + PROFILE.label + ' build complete!');
+    console.log(EXTENSION_NAME + ' universal (' + UNIVERSAL_PROFILE.label + ') build complete!');
 }
 
 runBuild().catch(err => {
