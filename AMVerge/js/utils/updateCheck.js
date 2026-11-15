@@ -12,6 +12,7 @@
   var REPO_PAGE = 'https://github.com/AMVerge-team/AMVerge-Extension';
   var FEED_URL = 'https://api.github.com/repos/AMVerge-team/AMVerge-Extension/releases/latest';
   var DEFAULT_PAGE = REPO_PAGE + '/releases/latest';
+  var CHANGELOG_RAW_URL = 'https://raw.githubusercontent.com/AMVerge-team/AMVerge/main/frontend/src/data/CHANGELOG.md';
   var TIMEOUT_MS = 8000;
 
   function nodeRequire(mod) {
@@ -46,7 +47,7 @@
     }
   }
 
-  function fetchJson(url, redirectsLeft, done) {
+  function fetchText(url, redirectsLeft, done) {
     var https = nodeRequire('https');
     if (!https) return done(null);
 
@@ -58,12 +59,11 @@
     }
 
     try {
-      // github's api rejects requests without a user agent
-      var headers = { 'User-Agent': 'AMVerge-Extension', 'Accept': 'application/vnd.github+json' };
+      var headers = { 'User-Agent': 'AMVerge-Extension' };
       var req = https.get(url, { headers: headers }, function (res) {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirectsLeft > 0) {
           res.resume();
-          return fetchJson(res.headers.location, redirectsLeft - 1, finish);
+          return fetchText(res.headers.location, redirectsLeft - 1, finish);
         }
         if (res.statusCode !== 200) {
           res.resume();
@@ -72,9 +72,7 @@
         var body = '';
         res.setEncoding('utf8');
         res.on('data', function (chunk) { body += chunk; });
-        res.on('end', function () {
-          try { finish(JSON.parse(body)); } catch (e) { finish(null); }
-        });
+        res.on('end', function () { finish(body); });
       });
       req.on('error', function () { finish(null); });
       req.setTimeout(TIMEOUT_MS, function () { req.abort(); finish(null); });
@@ -83,8 +81,43 @@
     }
   }
 
+  function fetchJson(url, redirectsLeft, done) {
+    fetchText(url, redirectsLeft, function (body) {
+      if (!body) return done(null);
+      try { done(JSON.parse(body)); } catch (e) { done(null); }
+    });
+  }
+
   var UpdateCheck = {
     _latest: null,
+    _changelogCache: null,
+
+    getInstalledVersion: installedVersion,
+
+    fetchSharedChangelog: function (done) {
+      var s = this;
+      if (s._changelogCache) return done(s._changelogCache);
+      fetchText(CHANGELOG_RAW_URL, 3, function (raw) {
+        if (!raw) return done(null);
+        var lines = String(raw).split(/\r?\n/);
+        var title = '';
+        var bullets = [];
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i].trim();
+          if (/^#{1,2}\s+/.test(line)) {
+            if (title) break;
+            title = line.replace(/^#+\s*/, '').trim();
+            continue;
+          }
+          if (title && /^[-*]\s+/.test(line)) {
+            bullets.push(line.replace(/^[-*]\s+/, '').trim());
+          }
+        }
+        if (!title) return done(null);
+        s._changelogCache = { version: title, bullets: bullets };
+        done(s._changelogCache);
+      });
+    },
 
     /** runs once per panel open; silent on any failure, since offline is normal */
     run: function () {

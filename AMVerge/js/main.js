@@ -256,6 +256,36 @@
 
     showAbout: function () {
       document.getElementById('aboutModal').style.display = '';
+      var verEl = document.getElementById('aboutVersionLabel');
+      if (verEl && window.UpdateCheck && window.UpdateCheck.getInstalledVersion) {
+        var ver = window.UpdateCheck.getInstalledVersion();
+        if (ver) verEl.textContent = 'v' + ver + ' (amverge CLI backend)';
+      }
+      var logEl = document.getElementById('aboutChangelogBody');
+      if (logEl && window.UpdateCheck && window.UpdateCheck.fetchSharedChangelog) {
+        window.UpdateCheck.fetchSharedChangelog(function (entry) {
+          if (!entry) {
+            logEl.innerHTML = '<p class="about-changelog-status">Changelog unavailable offline.</p>';
+            return;
+          }
+          logEl.innerHTML = '';
+          var heading = document.createElement('p');
+          heading.className = 'about-changelog-version';
+          var strong = document.createElement('strong');
+          strong.textContent = entry.version;
+          heading.appendChild(strong);
+          logEl.appendChild(heading);
+          if (entry.bullets && entry.bullets.length) {
+            var ul = document.createElement('ul');
+            for (var i = 0; i < entry.bullets.length; i++) {
+              var li = document.createElement('li');
+              li.textContent = entry.bullets[i];
+              ul.appendChild(li);
+            }
+            logEl.appendChild(ul);
+          }
+        });
+      }
     },
 
     cancelDetection: function () {
