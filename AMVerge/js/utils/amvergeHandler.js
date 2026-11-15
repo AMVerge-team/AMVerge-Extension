@@ -22,7 +22,7 @@
 
       this._outputDir = outputDir;
       this._scenes = [];
-      this._cancelling = false;
+      this._cancelling = false; 
       this._onProgress = callbacks.onProgress || null;
       this._onComplete = callbacks.onComplete || null;
       this._onError = callbacks.onError || null;
