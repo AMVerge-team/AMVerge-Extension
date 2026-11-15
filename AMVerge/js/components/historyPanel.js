@@ -2,6 +2,7 @@
   var HistoryPanel = {
     _runs: [],
     _appEpisodes: [],
+    _manifestCache: {},
     _syncTimer: null,
 
     init: function (app) {
@@ -18,7 +19,7 @@
       if (this._syncTimer) clearInterval(this._syncTimer);
       // Poll storage every 5 seconds for newly detected episodes in desktop app
       this._syncTimer = setInterval(function () {
-        s.syncFromDesktopApp();
+        if (!document.hidden) s.syncFromDesktopApp();
       }, 5000);
     },
 
@@ -36,33 +37,50 @@
 
         var dirs = window.FileSystem.fs.readdirSync(baseDir);
         var episodes = [];
+        var nextCache = {};
+        var changed = dirs.length !== Object.keys(this._manifestCache).length;
 
         for (var i = 0; i < dirs.length; i++) {
-          var episodeDir = window.FileSystem.path.join(baseDir, dirs[i]);
+          var dirName = dirs[i];
+          var episodeDir = window.FileSystem.path.join(baseDir, dirName);
           var manifestPath = window.FileSystem.path.join(episodeDir, 'manifest.json');
-          if (window.FileSystem.fileExists(manifestPath)) {
-            var content = window.FileSystem.readFile(manifestPath);
-            if (content) {
-              try {
-                var manifest = JSON.parse(content);
-                var videoPath = (manifest.source && manifest.source.videoPath) || dirs[i];
-                var scenes = manifest.scenes || [];
-                var count = (manifest.summary && manifest.summary.sceneCount) || scenes.length;
-                episodes.push({
-                  id: 'app_' + dirs[i],
-                  isAppEpisode: true,
-                  episodeCacheId: dirs[i],
-                  videoPath: videoPath,
-                  outputDir: episodeDir,
-                  manifestPath: manifestPath,
-                  sceneCount: count,
-                  method: (manifest.source && manifest.source.sceneDetectionMethod) || 'transnetv2_gpu',
-                  date: manifest.createdAtUnix ? new Date(manifest.createdAtUnix * 1000).toISOString() : new Date().toISOString()
-                });
-              } catch (e) {}
-            }
+          if (!window.FileSystem.fileExists(manifestPath)) continue;
+
+          var stat = window.FileSystem.fs.statSync(manifestPath);
+          var mtimeMs = stat ? stat.mtimeMs : 0;
+          var cached = this._manifestCache[dirName];
+          if (cached && cached.mtimeMs === mtimeMs) {
+            nextCache[dirName] = cached;
+            episodes.push(cached.entry);
+            continue;
           }
+
+          changed = true;
+          var content = window.FileSystem.readFile(manifestPath);
+          if (!content) continue;
+          try {
+            var manifest = JSON.parse(content);
+            var videoPath = (manifest.source && manifest.source.videoPath) || dirName;
+            var scenes = manifest.scenes || [];
+            var count = (manifest.summary && manifest.summary.sceneCount) || scenes.length;
+            var entry = {
+              id: 'app_' + dirName,
+              isAppEpisode: true,
+              episodeCacheId: dirName,
+              videoPath: videoPath,
+              outputDir: episodeDir,
+              manifestPath: manifestPath,
+              sceneCount: count,
+              method: (manifest.source && manifest.source.sceneDetectionMethod) || 'transnetv2_gpu',
+              date: manifest.createdAtUnix ? new Date(manifest.createdAtUnix * 1000).toISOString() : new Date().toISOString()
+            };
+            nextCache[dirName] = { mtimeMs: mtimeMs, entry: entry };
+            episodes.push(entry);
+          } catch (e) {}
         }
+
+        this._manifestCache = nextCache;
+        if (!changed) return;
 
         episodes.sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
         this._appEpisodes = episodes;

@@ -48,9 +48,22 @@
       }
     },
 
+    _releaseVideos: function (root) {
+      if (!root) return;
+      var videos = root.querySelectorAll('video');
+      for (var i = 0; i < videos.length; i++) {
+        try {
+          videos[i].pause();
+          videos[i].removeAttribute('src');
+          videos[i].load();
+        } catch (e) {}
+      }
+    },
+
     render: function () {
       var grid = document.getElementById('clipsGrid');
       if (!grid) return;
+      this._releaseVideos(grid);
       grid.innerHTML = '';
       grid.className = 'clips-grid density-' + this._density;
 
@@ -219,6 +232,7 @@
 
         var old = grid.querySelector('.clip-wrapper[data-index="' + idx + '"]');
         if (!old) return;
+        this._releaseVideos(old);
         var fresh = this._buildTile(s, i);
         // the appear animation is for a grid arriving all at once. replaying it
         // on every clip that finishes cutting would make the grid twitch

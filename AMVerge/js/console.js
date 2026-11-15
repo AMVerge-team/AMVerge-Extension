@@ -28,7 +28,7 @@
       console[cl]('[' + source + ']', message);
     } catch (e) {}
     if (window.ConsolePanel && window.ConsolePanel._active) {
-      window.ConsolePanel.renderLogContent();
+      window.ConsolePanel.scheduleRender();
     }
   }
 
@@ -66,6 +66,16 @@
 
   window.ConsolePanel = {
     _active: false,
+    _renderRaf: null,
+
+    scheduleRender: function () {
+      var s = this;
+      if (this._renderRaf !== null) return;
+      this._renderRaf = requestAnimationFrame(function () {
+        s._renderRaf = null;
+        if (s._active) s.renderLogContent();
+      });
+    },
 
     init: function () {
       this.bindEvents();
