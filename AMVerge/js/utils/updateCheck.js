@@ -114,7 +114,7 @@
       var bar = document.getElementById('updateBanner');
       if (!bar) return;
       document.getElementById('updateBannerText').textContent =
-        'AMVerge extension ' + feed.version + ' is available (you have ' + current + ').';
+        'AMVerge extension ' + feed.version + ' is available';
       bar.title = feed.notes || '';
       bar.style.display = 'flex';
     },
@@ -123,8 +123,25 @@
       var url = (this._latest && this._latest.url) || DEFAULT_PAGE;
       // only this repo's pages, so a bad response can't send users anywhere else
       if (url.indexOf(REPO_PAGE + '/') !== 0) url = DEFAULT_PAGE;
+      // the bundled CSInterface.js checks window.__adobe_cep_ (one underscore short) and no-ops,
+      // so go to cep's own api, then the os
       try {
-        new CSInterface().openURLInDefaultBrowser(url);
+        if (window.cep && window.cep.util && window.cep.util.openURLInDefaultBrowser) {
+          var code = window.cep.util.openURLInDefaultBrowser(url);
+          if (!code || code === 0 || (code.err === 0)) return;
+        }
+      } catch (e) {
+        dbg('warn', 'Update', 'cep.util could not open the browser: ' + e);
+      }
+
+      var cp = nodeRequire('child_process');
+      if (!cp) return;
+      try {
+        // no shell, so the url is never parsed as a command
+        var child = process.platform === 'win32'
+          ? cp.spawn('rundll32', ['url.dll,FileProtocolHandler', url], { detached: true, stdio: 'ignore' })
+          : cp.spawn('open', [url], { detached: true, stdio: 'ignore' });
+        child.unref();
       } catch (e) {
         dbg('warn', 'Update', 'Could not open browser: ' + e);
       }

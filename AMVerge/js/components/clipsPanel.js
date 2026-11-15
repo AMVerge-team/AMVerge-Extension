@@ -31,7 +31,7 @@
       // is where the proxy cache follows what the grid is actually showing
       if (window.PreviewProxy) window.PreviewProxy.reset(scenes, this.app);
       this.render();
-      document.getElementById('sceneCount').textContent = scenes.length;
+      this._renderCount();
     },
 
     _density: 'normal',
@@ -119,7 +119,6 @@
         var overlay = document.createElement('div');
         overlay.className = 'clip-overlay';
         overlay.innerHTML =
-          '<span class="clip-index">#' + (i + 1) + '</span>' +
           '<span class="clip-time">' + this._formatTime(s.start_sec || s.start || 0) + ' - ' + this._formatTime(s.end_sec || s.end || 0) + '</span>';
 
         var sel = document.createElement('div');
@@ -415,6 +414,13 @@
           items[i].classList.remove('selected');
         }
       }
+      this._renderCount();
+    },
+
+    /** "n / total selected" in the middle of the scenes header */
+    _renderCount: function () {
+      var el = document.getElementById('sceneCount');
+      if (el) el.textContent = Object.keys(this._selected).length + ' / ' + this._scenes.length + ' selected';
     },
 
     _formatTime: function (sec) {

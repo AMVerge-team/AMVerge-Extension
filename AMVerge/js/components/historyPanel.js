@@ -6,7 +6,9 @@
 
     init: function (app) {
       this.app = app;
-      this._runs = window.StorageManager.loadHistory();
+      this._runs = this._dedupe(window.StorageManager.loadHistory());
+      // older versions kept 50 runs, often several of one episode sharing a folder
+      this.enforceLimit();
       this.syncFromDesktopApp();
       this.startAutoSync();
     },
@@ -83,10 +85,42 @@
         method: method || 'transnetv2_gpu',
         date: new Date().toISOString()
       };
+      // a re-import writes over the same folder, so its older entries point at these files now
+      var s = this;
+      this._runs = this._runs.filter(function (r) { return !s._samePath(r.outputDir, outputDir); });
       this._runs.unshift(run);
-      if (this._runs.length > 50) this._runs = this._runs.slice(0, 50);
       window.StorageManager.saveHistory(this._runs);
+      this.enforceLimit();
       return run;
+    },
+
+    /** deletes the oldest runs (entry and files) past the settings' history limit; 0 means no limit */
+    enforceLimit: function () {
+      var limit = this.app && this.app.settings ? this.app.settings.historyLimit : 10;
+      if (!limit || this._runs.length <= limit) return;
+
+      var kept = this._runs.slice(0, limit);
+      var evicted = this._runs.slice(limit);
+      var open = window.App && window.App._currentOutputDir;
+      var s = this;
+      for (var i = 0; i < evicted.length; i++) {
+        var dir = evicted[i].outputDir;
+        // never a folder a kept run or the open episode still uses
+        var inUse = (open && this._samePath(dir, open)) ||
+          kept.some(function (r) { return s._samePath(r.outputDir, dir); });
+        if (!dir || inUse || !window.FileSystem || !window.FileSystem.deleteFolderRecursive) continue;
+        try {
+          window.FileSystem.deleteFolderRecursive(dir);
+        } catch (e) {
+          dbg('warn', 'History', 'Could not delete ' + dir + ': ' + e);
+        }
+      }
+      dbg('info', 'History', 'Deleted ' + evicted.length + ' oldest run(s) past the limit of ' + limit);
+      this._runs = kept;
+      window.StorageManager.saveHistory(this._runs);
+      if (document.getElementById('page-history') && document.getElementById('page-history').classList.contains('active')) {
+        this.render();
+      }
     },
 
     render: function () {
@@ -319,6 +353,21 @@
       }
     },
 
+    /** newest entry per output folder; the rest point at files a later run replaced */
+    _dedupe: function (runs) {
+      var s = this;
+      var seen = [];
+      var out = [];
+      for (var i = 0; i < runs.length; i++) {
+        var dir = runs[i].outputDir;
+        if (seen.some(function (d) { return s._samePath(d, dir); })) continue;
+        seen.push(dir);
+        out.push(runs[i]);
+      }
+      if (out.length !== runs.length) window.StorageManager.saveHistory(out);
+      return out;
+    },
+
     _samePath: function (a, b) {
       return String(a).replace(/[\\/]+$/, '').replace(/\\/g, '/').toLowerCase() ===
              String(b).replace(/[\\/]+$/, '').replace(/\\/g, '/').toLowerCase();
@@ -332,7 +381,11 @@
     },
 
     promptClearAll: function () {
-      if (!this._runs.length) return;
+      this._runs = window.StorageManager.loadHistory();
+      if (!this._runs.length) {
+        window.showToast('No stored episodes to clear', 'info');
+        return;
+      }
 
       var desc = document.getElementById('clearHistoryDesc');
       if (desc) {

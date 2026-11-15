@@ -8,23 +8,32 @@
   flex: 1;
 }
 
+/* page headings (settings, history). calibri and line-height 1 so the text centres on the icon;
+   the pixel font sat high in its line box */
 .settings-heading {
   margin: 0 0 var(--space-md);
-  font-size: var(--text-lg);
-  font-weight: 400;
+  font-family: Calibri, "Segoe UI", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
   color: var(--text);
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  letter-spacing: 0.5px;
+  letter-spacing: 0.2px;
 }
 .settings-heading .icon {
+  display: block;
+  flex: none;
   color: var(--accent);
   opacity: 0.9;
 }
 
+/* a card's own heading starts at the card's padding, so its top matches its side gap */
 .settings-subheading {
-  margin: var(--space-md) 0 var(--space-sm);
+  margin: 0 0 var(--space-sm);
+  font-family: Calibri, "Segoe UI", sans-serif;
+  line-height: 1;
   font-size: var(--text-sm);
   font-weight: 400;
   color: var(--text-faint);
@@ -45,11 +54,6 @@
   border-left: 2px solid rgb(var(--accent-rgb) / 0.4);
   border-radius: var(--radius);
   transition: all var(--transition);
-}
-
-.settings-group:hover {
-  border-left-color: var(--accent);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
 /* backdrop-filter makes each group a stacking context, so the picker popover
@@ -73,6 +77,7 @@
 }
 
 .settings-label {
+  font-family: Calibri, "Segoe UI", sans-serif;
   font-size: var(--text-base);
   color: var(--text-dim);
   white-space: nowrap;
@@ -127,6 +132,12 @@
   outline: none;
   transition: all var(--transition);
 }
+/* a short count, with room for the clear button beside it */
+.settings-number-input {
+  width: 64px;
+  margin-right: 6px;
+}
+
 .settings-text-input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 10px rgb(var(--accent-rgb) / 0.35);
@@ -401,10 +412,46 @@
     min-width: 0;
   }
 
-  .settings-control > .custom-checkbox,
+  /* the checkbox keeps its 18px: its box is absolutely positioned, so width auto collapsed it to 0 and the box hung past the card */
+  .settings-control > .custom-checkbox {
+    flex: 0 0 auto;
+  }
+
   .settings-control > .color-picker-container,
   .settings-control > .button {
     flex: 0 0 auto;
     width: auto;
   }
+
+  /* small controls (checkboxes, swatch, slider, upload) stay beside their label */
+  .settings-row.settings-row-inline {
+    flex-direction: row;
+    align-items: center;
+    padding: var(--space-xs) 0;
+  }
+
+  .settings-row.settings-row-inline .settings-label {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  /* takes the space the label leaves, so a slider shrinks instead of running under the label */
+  .settings-row.settings-row-inline .settings-control {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    justify-content: flex-end;
+  }
+
+  .settings-row.settings-row-inline .settings-range {
+    flex: 0 1 110px;
+    width: auto;
+    min-width: 40px;
+  }
+}
+
+/* a status value with a button beside it, flush right like the plain values above (after the media query so it wins there too) */
+.settings-control.settings-control-end {
+  width: auto;
+  justify-content: flex-end;
 }

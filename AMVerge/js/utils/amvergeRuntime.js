@@ -16,7 +16,8 @@
   var PYTHON_VERSION_GPU_DECODE = '3.13';
   var TORCH_CUDA_INDEX = 'https://download.pytorch.org/whl/cu128';
   var TORCH_CUDA_INDEX_GPU_DECODE = 'https://download.pytorch.org/whl/cu130';
-  var TORCH_PIN_GPU_DECODE = 'torch==2.13.*';
+  var TORCH_PIN_GPU_DECODE = 'torch==2.14.*';
+  var NELUX_PIN_GPU_DECODE = 'nelux==0.21.*';
   var TORCH_FAMILY = ['torch', 'torchvision'];
 
   var AmvergeRuntime = {
@@ -94,6 +95,11 @@
       return this._ask(python, 'import importlib.util as u; print(u.find_spec("nelux") is not None)') === 'True';
     },
 
+    isCuda13Torch: function (python) {
+      var ver = this._ask(python, 'import importlib.metadata as m; print(m.version("torch"))');
+      return !!ver && ver.indexOf('+cu13') !== -1;
+    },
+
     /** true when amverge is an editable install pointing outside site-packages */
     isEditableCheckout: function (python) {
       var where = this._ask(python,
@@ -109,11 +115,11 @@
     _distsForExtras: function (extras) {
       var map = {
         ml: ['transnetv2-pytorch', 'tqdm'],
-        nelux: ['nelux>=0.18'],
-        depth: ['depth-anything-v2', 'opencv-python-headless'],
+        nelux: [NELUX_PIN_GPU_DECODE],
+        depth: ['torchvision', 'opencv-python-headless'],
         interpolation: ['scipy', 'opencv-python-headless'],
-        scout: ['transformers', 'pillow'],
-        upscale: ['spandrel', 'onnxruntime']
+        scout: ['transformers', 'pillow', 'opencv-python-headless'],
+        upscale: ['spandrel', 'onnxruntime', 'opencv-python-headless']
       };
       var out = [];
       for (var i = 0; i < extras.length; i++) {
@@ -229,10 +235,13 @@
         }
 
         args = args.concat(TORCH_FAMILY);
-        if (wantNelux) args.push(TORCH_PIN_GPU_DECODE);
+        if (wantNelux) {
+          args.push(TORCH_PIN_GPU_DECODE, NELUX_PIN_GPU_DECODE);
+        }
         if (opts.gpu) {
+          var onCuda13 = existing ? s.isCuda13Torch(python) : false;
           args.push('--extra-index-url');
-          args.push(wantNelux ? TORCH_CUDA_INDEX_GPU_DECODE : TORCH_CUDA_INDEX);
+          args.push((wantNelux || onCuda13) ? TORCH_CUDA_INDEX_GPU_DECODE : TORCH_CUDA_INDEX);
         }
 
         stage(wantNelux

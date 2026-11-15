@@ -48,8 +48,10 @@
 
 .setup-step h2 {
   margin: 0 0 10px;
-  font-size: 15px;
-  font-weight: 400;
+  font-family: Calibri, "Segoe UI", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
   display: flex;
   align-items: center;
   gap: 6px;

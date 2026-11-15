@@ -50,6 +50,7 @@
 .history-item-main { flex: 1; min-width: 0; }
 
 .history-item-name {
+  font-family: Calibri, "Segoe UI", sans-serif;
   font-size: var(--text-base);
   color: var(--text);
   white-space: nowrap;

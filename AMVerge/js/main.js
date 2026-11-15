@@ -14,6 +14,7 @@
       gridPreviewSpeed: 1.0,
       showClipTimestamps: true,
       syncThemeWithApp: false,
+      historyLimit: 10,
       theme: 'dark'
     },
 
@@ -300,29 +301,27 @@
       });
     },
 
+    /** the detect button always shows: greyed with a hint until a video layer is selected, then names it by its number */
     updateLayerInfoDisplay: function () {
-      var wrap = document.getElementById('aeLayerActionWrap');
-      var btnName = document.getElementById('aeLayerBtnName');
-      var layer = this._selectedLayerInfo;
-
-      if (!layer || !layer.ok || !layer.filePath) {
-        if (wrap) wrap.style.display = 'none';
-        return;
-      }
-
-      // the resolution/fps pill is gone; the layer name on the button is the
-      // only thing the card needs to say about what is selected
-      var name = layer.layerName || layer.name || 'Footage';
-      if (btnName) btnName.textContent = name;
-      // the name is ellipsised on the button, so the whole of it lives on hover
       var btn = document.getElementById('detectActiveLayerBtn');
-      if (btn) btn.title = 'Detect scenes in ' + name;
-      if (wrap) wrap.style.display = 'flex';
+      var label = document.getElementById('detectLayerLabel');
+      var layer = this._selectedLayerInfo;
+      // a timeline layer only: host.jsx also reports project-panel or viewer footage, which carries no layer index
+      var ready = Boolean(layer && layer.ok && layer.filePath && layer.layerIndex);
+      var name = ready ? (layer.layerName || layer.name || 'Footage') : '';
+      var number = ready ? ' #' + layer.layerIndex : '';
+
+      if (btn) {
+        btn.disabled = !ready;
+        // the full layer name is on hover, since the button only shows its number
+        btn.title = ready ? 'Detect scenes in ' + name : 'Select a video layer in After Effects';
+      }
+      if (label) label.textContent = ready ? 'Detect Selected Layer' + number : 'Select a layer to detect its scenes';
     },
 
     startImportFromActiveLayer: function () {
       var layer = this._selectedLayerInfo;
-      if (layer && layer.ok && layer.filePath) {
+      if (layer && layer.ok && layer.filePath && layer.layerIndex) {
         this.runDetection(layer.filePath);
       } else {
         window.showToast('Select a video layer in After Effects first', 'warn');
@@ -343,9 +342,12 @@
       this._currentScenes = [];
       this._importedCount = 0;
 
+      // one folder per episode, also under a custom output directory: history evicts
+      // runs by deleting their folder, which must never take another run or the user's files
       var outputDir = this.settings.outputDir;
-      if (!outputDir && window.FileSystem && window.FileSystem.path && window.FileSystem.os) {
-        outputDir = window.FileSystem.path.join(window.FileSystem.getTempDir(), 'AMVerge', window.FileSystem.getFileNameWithoutExtension(videoPath));
+      if (window.FileSystem && window.FileSystem.path && window.FileSystem.os) {
+        var base = outputDir || window.FileSystem.path.join(window.FileSystem.getTempDir(), 'AMVerge');
+        outputDir = window.FileSystem.path.join(base, window.FileSystem.getFileNameWithoutExtension(videoPath));
       }
       // kept so deleting this run from history can close the open episode
       this._currentOutputDir = outputDir;
@@ -646,6 +648,14 @@
       this.settings.showClipTimestamps = showTimestampsBox ? showTimestampsBox.checked : true;
       var syncBox = document.getElementById('settingsSyncTheme');
       this.settings.syncThemeWithApp = syncBox ? syncBox.checked : false;
+      var limitBox = document.getElementById('settingsHistoryLimit');
+      if (limitBox) {
+        var limit = parseInt(limitBox.value, 10);
+        this.settings.historyLimit = isNaN(limit) || limit < 0 ? 10 : limit;
+        limitBox.value = this.settings.historyLimit;
+        // a lower cap applies now, not only on the next import
+        if (window.HistoryPanel) window.HistoryPanel.enforceLimit();
+      }
 
       if (this.settings.syncThemeWithApp) {
         // clearing the hash forces the pull. the watcher skips a theme it has
@@ -1025,12 +1035,14 @@
       var status = {};
 
       var version = run(['--version'], 5000);
-      status.python = version ? '✓ ' + version : '✗ Not found';
+      status.python = version || 'Not found';
+      status.pythonOk = Boolean(version);
 
       // asked of the package itself: `pip show` needs pip, which the app's
       // uv-made environment does not have
       var cliVersion = run(['-c', 'import amverge; print(amverge.__version__)']);
-      status.amverge = cliVersion ? '✓ v' + cliVersion : '✗ Not installed';
+      status.amverge = cliVersion ? 'v' + cliVersion : 'Not installed';
+      status.amvergeOk = Boolean(cliVersion);
 
       var torch = run([
         '-c',
@@ -1047,9 +1059,7 @@
       // remembered so the settings button can offer the opposite action
       this._gpuDecodeOn = nelux === 'ready';
       status.gpuDecodeOn = this._gpuDecodeOn;
-      status.gpuDecode = nelux === 'ready'
-        ? '✓ NVDEC enabled'
-        : 'Off';
+      status.gpuDecode = nelux === 'ready' ? 'NVDEC enabled' : 'Off';
 
       status.interpreter = python;
 

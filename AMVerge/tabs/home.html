@@ -4,9 +4,9 @@
       <span class="amverge-wordmark amverge-wordmark-full"><span class="wm-accent">AMV</span>erge</span>
       <p class="import-tagline">Scene selection made easy.</p>
 
-      <div id="aeLayerActionWrap" class="ae-layer-action-wrap" style="display:none">
-        <button class="button button-accent button-large button-full" id="detectActiveLayerBtn" onclick="App.startImportFromActiveLayer()">
-          <svg class="icon"><use href="#icon-layers"/></svg> Detect Selected Layer (<span id="aeLayerBtnName">Footage</span>)
+      <div id="aeLayerActionWrap" class="ae-layer-action-wrap">
+        <button class="button button-accent button-large button-full" id="detectActiveLayerBtn" onclick="App.startImportFromActiveLayer()" disabled>
+          <svg class="icon"><use href="#icon-layers"/></svg> <span id="detectLayerLabel">Select a layer to detect its scenes</span>
         </button>
       </div>
 
@@ -22,27 +22,20 @@
     </div>
     <div id="importProgress" class="import-progress" style="display:none">
       <div class="import-status-row">
-        <span class="import-label">Detecting scenes...</span>
+        <span class="import-label">Detecting Scenes...</span>
         <span class="import-pct" id="importPct">0%</span>
       </div>
       <div class="progress-bar"><div class="progress-fill" id="importProgressFill" style="width:0%"></div></div>
       
       <div class="import-time-row">
+        <div class="import-status-text" id="importStatusText">Initializing...</div>
         <div class="import-time-stat">
           <span class="import-time-label">Elapsed</span>
           <span class="import-time-val" id="importElapsedVal">00:00</span>
         </div>
-        <div class="import-time-stat">
-          <span class="import-time-label">ETA</span>
-          <span class="import-time-val" id="importEtaVal">--:--</span>
-        </div>
       </div>
-
-      <div class="import-status-text" id="importStatusText">Initializing...</div>
       <div class="import-cancel-row">
-        <button class="button button-danger" onclick="App.cancelDetection()">
-          <svg class="icon"><use href="#icon-x"/></svg> Cancel
-        </button>
+        <button class="import-cancel-link" onclick="App.cancelDetection()">Cancel</button>
       </div>
     </div>
   </div>
@@ -53,8 +46,8 @@
         <div class="pane-header">
           <div class="pane-header-left">
             <span class="pane-title">Scenes</span>
-            <span class="scene-count" id="sceneCount">0</span>
           </div>
+          <span class="scene-count" id="sceneCount">0 / 0 selected</span>
           <div class="pane-header-actions">
             <div class="density-toggles">
               <button class="density-btn" data-density="compact" onclick="ClipsPanel.setDensity('compact')" title="Compact View">S</button>

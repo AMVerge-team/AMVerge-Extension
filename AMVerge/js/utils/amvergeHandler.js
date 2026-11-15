@@ -26,8 +26,6 @@
       this._onProgress = callbacks.onProgress || null;
       this._onComplete = callbacks.onComplete || null;
       this._onError = callbacks.onError || null;
-      // streaming events, emitted by the transnetv2 path only. a keyframe run
-      // never fires them and simply finishes through onComplete as before
       this._onInitialClips = callbacks.onInitialClips || null;
       this._onClipReady = callbacks.onClipReady || null;
       this._onThumbnail = callbacks.onThumbnail || null;
@@ -35,8 +33,6 @@
       this._onReencode = callbacks.onReencodeProgress || null;
 
       var method = opts.method || 'keyframe';
-      // `{ command, prefix }` from App._resolveCli. the fallback keeps this
-      // callable on its own, and matches the pre-console-script behaviour
       var cli = opts.cli || { command: opts.pythonPath || 'python', prefix: ['-m', 'amverge'] };
 
       if (!window.FileSystem || !window.FileSystem.childProcess) {
@@ -145,7 +141,8 @@
             var msg = parts.length > 2 ? parts.slice(2).join('|') : '';
             if (s._onProgress) s._onProgress(pct, msg, 'detect');
           } else if (!s._handleEvent(line)) {
-            dbg('debug', 'CLI', line);
+            // a scene cut is live progress worth seeing in the console, the rest is cli chatter
+            dbg(/^Scene \d+ detected/.test(line) ? 'info' : 'debug', 'CLI', line);
           }
         }
       });

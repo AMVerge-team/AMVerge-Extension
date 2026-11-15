@@ -29,6 +29,8 @@
       if (window.CustomSelect) window.CustomSelect.syncLabel(detection);
       document.getElementById('settingsLayerPrefix').value = settings.layerPrefix || 'AMVerge_';
       document.getElementById('settingsAutoScale').checked = settings.autoScale !== false;
+      var limitBox = document.getElementById('settingsHistoryLimit');
+      if (limitBox) limitBox.value = settings.historyLimit !== undefined ? settings.historyLimit : 10;
 
       var syncCheckbox = document.getElementById('settingsSyncTheme');
       if (syncCheckbox) syncCheckbox.checked = settings.syncThemeWithApp === true;
@@ -100,14 +102,15 @@
       var envEl = document.getElementById('sysInterpreter');
 
       if (status) {
+        // green marks a check that passed; the text itself carries no symbol
         if (pyEl) pyEl.textContent = status.python || 'Unknown';
-        if (pyEl) pyEl.style.color = status.python && status.python.indexOf('✓') !== -1 ? 'var(--accent)' : '';
+        if (pyEl) pyEl.style.color = status.pythonOk ? 'var(--accent)' : '';
         if (amvEl) amvEl.textContent = status.amverge || 'Unknown';
-        if (amvEl) amvEl.style.color = status.amverge && status.amverge.indexOf('✓') !== -1 ? 'var(--accent)' : '';
+        if (amvEl) amvEl.style.color = status.amvergeOk ? 'var(--accent)' : '';
         if (gpuEl) gpuEl.textContent = status.gpu || 'Unknown';
         if (decodeEl) {
           decodeEl.textContent = status.gpuDecode || 'Unknown';
-          decodeEl.style.color = status.gpuDecode && status.gpuDecode.indexOf('✓') !== -1 ? 'var(--accent)' : '';
+          decodeEl.style.color = status.gpuDecodeOn ? 'var(--accent)' : '';
         }
         var decodeBtn = document.getElementById('gpuDecodeBtn');
         if (decodeBtn) decodeBtn.textContent = status.gpuDecodeOn ? 'Disable' : 'Enable';
