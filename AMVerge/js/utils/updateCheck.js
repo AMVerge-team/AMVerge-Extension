@@ -130,7 +130,8 @@
         var feed = {
           version: String(release.tag_name).replace(/^v/i, ''),
           url: release.html_url,
-          notes: release.body || ''
+          notes: release.body || '',
+          assets: release.assets || []
         };
         if (compareVersions(feed.version, current) <= 0) return;
 
@@ -146,10 +147,163 @@
     _show: function (current, feed) {
       var bar = document.getElementById('updateBanner');
       if (!bar) return;
-      document.getElementById('updateBannerText').textContent =
-        'AMVerge extension ' + feed.version + ' is available';
+      var textEl = document.getElementById('updateBannerText');
+      var btn = document.getElementById('updateBannerBtn');
+
+      if (textEl) {
+        textEl.textContent = 'AMVerge extension ' + feed.version + ' is available';
+      }
+      if (btn) {
+        btn.textContent = (process.platform === 'win32') ? 'Update Now' : 'Download';
+        btn.disabled = false;
+      }
+
       bar.title = feed.notes || '';
       bar.style.display = 'flex';
+      this._state = 'ready';
+    },
+
+    handleAction: function () {
+      if (this._state === 'reload') {
+        window.location.reload();
+        return;
+      }
+
+      // If Windows, attempt 1-click background installer download and silent install
+      if (process.platform === 'win32' && this._latest && this._latest.assets) {
+        var exeAsset = null;
+        for (var i = 0; i < this._latest.assets.length; i++) {
+          var a = this._latest.assets[i];
+          if (a.name && a.name.toLowerCase().endsWith('.exe')) {
+            exeAsset = a;
+            break;
+          }
+        }
+        if (exeAsset && exeAsset.browser_download_url) {
+          this._startAutoUpdate(exeAsset.browser_download_url);
+          return;
+        }
+      }
+
+      // Fallback: open release download in default browser
+      this.openDownload();
+    },
+
+    _startAutoUpdate: function (downloadUrl) {
+      var s = this;
+      var textEl = document.getElementById('updateBannerText');
+      var btn = document.getElementById('updateBannerBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Downloading...';
+      }
+
+      var os = nodeRequire('os');
+      var path = nodeRequire('path');
+      var fs = nodeRequire('fs');
+      var https = nodeRequire('https');
+      var cp = nodeRequire('child_process');
+
+      if (!os || !path || !fs || !https || !cp) {
+        s.openDownload();
+        return;
+      }
+
+      var tempFile = path.join(os.tmpdir(), 'AMVergeSetup-' + (s._latest.version || 'latest') + '.exe');
+      var file = fs.createWriteStream(tempFile);
+
+      function downloadStream(url, redirectsLeft) {
+        var headers = { 'User-Agent': 'AMVerge-Extension' };
+        var req = https.get(url, { headers: headers }, function (res) {
+          if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirectsLeft > 0) {
+            res.resume();
+            return downloadStream(res.headers.location, redirectsLeft - 1);
+          }
+          if (res.statusCode !== 200) {
+            res.resume();
+            if (textEl) textEl.textContent = 'Download failed. Click to open browser.';
+            if (btn) {
+              btn.disabled = false;
+              btn.textContent = 'Download';
+            }
+            s._state = 'fallback';
+            return;
+          }
+
+          var totalBytes = parseInt(res.headers['content-length'] || '0', 10);
+          var downloaded = 0;
+
+          res.on('data', function (chunk) {
+            downloaded += chunk.length;
+            if (totalBytes > 0 && textEl) {
+              var pct = Math.round((downloaded / totalBytes) * 100);
+              textEl.textContent = 'Downloading update... ' + pct + '%';
+            }
+          });
+
+          res.pipe(file);
+
+          file.on('finish', function () {
+            file.close(function () {
+              if (textEl) textEl.textContent = 'Installing update in background...';
+              if (btn) btn.textContent = 'Installing...';
+
+              try {
+                // Inno Setup silent switches:
+                // /VERYSILENT: silent with no background wizard
+                // /SUPPRESSMSGBOXES: auto-confirm overwrite of existing extension files
+                // /NORESTART: prevent reboot request
+                var proc = cp.spawn(tempFile, ['/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'], {
+                  detached: true,
+                  stdio: 'ignore',
+                  windowsHide: true
+                });
+
+                proc.on('close', function (code) {
+                  try { fs.unlinkSync(tempFile); } catch (e) {}
+
+                  if (code === 0) {
+                    s._state = 'reload';
+                    if (textEl) textEl.textContent = 'Update installed successfully!';
+                    if (btn) {
+                      btn.disabled = false;
+                      btn.textContent = 'Reload Panel';
+                    }
+                  } else {
+                    if (textEl) textEl.textContent = 'Silent install exited (' + code + '). Manual update:';
+                    if (btn) {
+                      btn.disabled = false;
+                      btn.textContent = 'Open Installer';
+                    }
+                    s._state = 'fallback';
+                  }
+                });
+
+                proc.on('error', function (err) {
+                  dbg('warn', 'Update', 'Installer spawn error: ' + err);
+                  s.openDownload();
+                });
+              } catch (e) {
+                dbg('warn', 'Update', 'Failed to run installer: ' + e);
+                s.openDownload();
+              }
+            });
+          });
+        });
+
+        req.on('error', function (err) {
+          try { fs.unlinkSync(tempFile); } catch (e) {}
+          dbg('warn', 'Update', 'Download error: ' + err);
+          if (textEl) textEl.textContent = 'Download error. Click to open browser.';
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Download';
+          }
+          s._state = 'fallback';
+        });
+      }
+
+      downloadStream(downloadUrl, 5);
     },
 
     openDownload: function () {
