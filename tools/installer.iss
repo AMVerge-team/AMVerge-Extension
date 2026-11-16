@@ -57,7 +57,7 @@ begin
 
   if DirExists(DestDir) then
   begin
-    if MsgBox('An existing version of AMVerge Extension was found.' #13#10 #13#10 'Do you want to overwrite it and continue with the installation?', mbConfirmation, MB_YESNO) = IDNO then
+    if SuppressibleMsgBox('An existing version of AMVerge Extension was found.' #13#10 #13#10 'Do you want to overwrite it and continue with the installation?', mbConfirmation, MB_YESNO, IDYES) = IDNO then
     begin
       Result := False;
     end;
