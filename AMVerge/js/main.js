@@ -576,6 +576,79 @@
       // it must not discard what the user has ticked for export
     },
 
+    // --- Source Mode (AE Local vs AMVerge App) ---
+    _activeSource: 'local',
+    _localSavedState: null,
+    _appSavedState: null,
+
+    setSourceMode: function (mode) {
+      if (this._activeSource === mode) return;
+
+      var prev = this._activeSource;
+      // Save current view state before switching
+      var currentState = {
+        scenes: this._currentScenes.slice(),
+        video: this._currentVideo,
+        outputDir: this._currentOutputDir,
+        scenePanelVisible: document.getElementById('scenePanel').style.display !== 'none',
+        importAreaVisible: document.getElementById('importArea').style.display !== 'none'
+      };
+
+      if (prev === 'local') {
+        this._localSavedState = currentState;
+      } else {
+        this._appSavedState = currentState;
+      }
+
+      this._activeSource = mode;
+
+      var pillLocal = document.getElementById('sourcePillLocal');
+      var pillApp = document.getElementById('sourcePillApp');
+      if (pillLocal) pillLocal.classList.toggle('active', mode === 'local');
+      if (pillApp) pillApp.classList.toggle('active', mode === 'app');
+
+      if (mode === 'local') {
+        if (this._localSavedState && this._localSavedState.scenes.length > 0) {
+          this._currentScenes = this._localSavedState.scenes;
+          this._currentVideo = this._localSavedState.video;
+          this._currentOutputDir = this._localSavedState.outputDir;
+          window.ClipsPanel.loadScenes(this._currentScenes);
+          document.getElementById('importArea').style.display = 'none';
+          document.getElementById('scenePanel').style.display = '';
+        } else {
+          this.closeEpisode();
+        }
+      } else {
+        // App Sync Mode: attempt to load active desktop episode
+        var targetState = this._appSavedState;
+        if (targetState && targetState.scenes.length > 0) {
+          this._currentScenes = targetState.scenes;
+          this._currentVideo = targetState.video;
+          this._currentOutputDir = targetState.outputDir;
+          window.ClipsPanel.loadScenes(this._currentScenes);
+          document.getElementById('importArea').style.display = 'none';
+          document.getElementById('scenePanel').style.display = '';
+        } else if (window.HistoryPanel && window.HistoryPanel.loadActiveDesktopEpisode) {
+          var loaded = window.HistoryPanel.loadActiveDesktopEpisode();
+          if (!loaded) {
+            window.showToast('No active episode open in AMVerge Desktop App', 'info');
+            this.closeEpisode();
+          }
+        }
+      }
+    },
+
+    updateAppBadge: function (count) {
+      var badge = document.getElementById('sourceAppBadge');
+      if (!badge) return;
+      if (count > 0) {
+        badge.textContent = String(count);
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    },
+
     /** back to the import screen, dropping the loaded episode.
      *
      * The panel otherwise has no way out of a loaded episode: once the scene

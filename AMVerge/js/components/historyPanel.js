@@ -80,6 +80,10 @@
         }
 
         this._manifestCache = nextCache;
+
+        // Check for active_episode.json pointer written by the desktop app
+        this._checkActiveEpisodeSync(baseDir);
+
         if (!changed) return;
 
         episodes.sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
@@ -92,6 +96,49 @@
       } catch (e) {
         dbg('debug', 'History', 'App sync: ' + e.message);
       }
+    },
+
+    _activeEpisodePointer: null,
+
+    _checkActiveEpisodeSync: function (baseDir) {
+      if (!window.FileSystem || !window.FileSystem.path) return;
+      var episodesRoot = window.FileSystem.path.dirname(baseDir);
+      var pointerPath = window.FileSystem.path.join(episodesRoot, 'active_episode.json');
+
+      if (!window.FileSystem.fileExists(pointerPath)) {
+        if (window.App && window.App.updateAppBadge) {
+          window.App.updateAppBadge(0);
+        }
+        return;
+      }
+
+      var raw = window.FileSystem.readFile(pointerPath);
+      if (!raw) return;
+
+      try {
+        var pointer = JSON.parse(raw);
+        this._activeEpisodePointer = pointer;
+        if (window.App && window.App.updateAppBadge) {
+          window.App.updateAppBadge(pointer.scene_count || 0);
+        }
+
+        // If user currently has the AMVerge App source pill active, keep it synced
+        if (window.App && window.App._activeSource === 'app' &&
+            (!window.App._currentScenes || window.App._currentScenes.length === 0)) {
+          this.loadActiveDesktopEpisode();
+        }
+      } catch (e) {}
+    },
+
+    loadActiveDesktopEpisode: function () {
+      if (!this._activeEpisodePointer) return false;
+      var p = this._activeEpisodePointer;
+      var manifestPath = p.manifest_path;
+      var outputDir = window.FileSystem && window.FileSystem.path ?
+        window.FileSystem.path.dirname(manifestPath) : '';
+
+      this.loadItem(manifestPath, outputDir);
+      return true;
     },
 
     addRun: function (videoPath, outputDir, sceneCount, method) {
