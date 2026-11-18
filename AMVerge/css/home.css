@@ -17,8 +17,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: center;
-  padding: 3px;
-  min-width: 248px;
+  padding: 2px;
   border-radius: 999px;
   background: linear-gradient(180deg, rgba(8, 8, 8, 0.92), rgba(20, 20, 20, 0.92));
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -32,10 +31,10 @@
 
 .source-pill-thumb {
   position: absolute;
-  top: 3px;
-  bottom: 3px;
-  left: 3px;
-  width: calc(50% - 3px);
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: calc(50% - 2px);
   border-radius: 999px;
   background: linear-gradient(180deg, rgb(var(--accent-rgb) / 0.34), rgb(var(--accent-rgb) / 0.16));
   border: 1px solid rgb(var(--accent-rgb) / 0.55);
@@ -56,13 +55,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  height: 26px;
-  padding: 0 14px;
+  gap: 5px;
+  height: 22px;
+  padding: 0 10px;
   font-family: var(--font-ui);
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   white-space: nowrap;
   color: rgba(255, 255, 255, 0.5);
   background: transparent;
@@ -74,8 +73,8 @@
 }
 
 .source-pill .icon {
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   opacity: 0.75;
   transition: color 0.18s ease, opacity 0.18s ease;
 }
@@ -97,56 +96,8 @@
   opacity: 1;
 }
 
-/* live dot: the desktop app has an episode open right now */
-.source-pill-live {
-  display: none;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 0 0 rgb(var(--accent-rgb) / 0.6);
-  animation: source-pill-pulse 1.8s ease-out infinite;
-}
-
-.source-pill.has-live .source-pill-live {
-  display: inline-block;
-}
-
-@keyframes source-pill-pulse {
-  0% { box-shadow: 0 0 0 0 rgb(var(--accent-rgb) / 0.55); }
-  70% { box-shadow: 0 0 0 5px rgb(var(--accent-rgb) / 0); }
-  100% { box-shadow: 0 0 0 0 rgb(var(--accent-rgb) / 0); }
-}
-
-/* scene count: a tiny capsule of its own */
-.source-pill .source-pill-count {
-  min-width: 18px;
-  height: 15px;
-  padding: 0 6px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 700;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.75);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
-}
-
-.source-pill.active .source-pill-count {
-  color: #000;
-  background: var(--accent);
-  border-color: transparent;
-}
-
 @media (prefers-reduced-motion: reduce) {
   .source-pill-thumb { transition: none; }
-  .source-pill-live { animation: none; }
 }
 
 /* ====================
