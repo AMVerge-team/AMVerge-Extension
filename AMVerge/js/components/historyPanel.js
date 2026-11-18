@@ -26,6 +26,9 @@
     syncFromDesktopApp: function () {
       if (!window.FileSystem || !window.FileSystem.path || !window.FileSystem.os) return;
       try {
+        // Always check active_episode.json first so custom desktop storage paths still live-sync
+        this._checkActiveEpisodeSync();
+
         var appData = process.env.APPDATA || window.FileSystem.path.join(window.FileSystem.getHomeDir(), 'AppData', 'Roaming');
         var baseDir = window.FileSystem.path.join(appData, 'app.amverge', 'episodes', 'episodes_storage');
 
@@ -80,6 +83,7 @@
         }
 
         this._manifestCache = nextCache;
+
         if (!changed) return;
 
         episodes.sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
@@ -92,6 +96,93 @@
       } catch (e) {
         dbg('debug', 'History', 'App sync: ' + e.message);
       }
+    },
+
+    _activeEpisodePointer: null,
+    _activeEpisodeKey: null,
+
+    _findActiveEpisodePointerPath: function () {
+      if (!window.FileSystem || !window.FileSystem.path) return null;
+      var p = window.FileSystem.path;
+      var home = window.FileSystem.getHomeDir ? window.FileSystem.getHomeDir() : '';
+      var roaming = process.env.APPDATA || (home ? p.join(home, 'AppData', 'Roaming') : '');
+      var candidates = [];
+
+      if (roaming) {
+        candidates.push(p.join(roaming, 'app.amverge', 'episodes', 'active_episode.json'));
+        candidates.push(p.join(roaming, 'AMVerge', 'episodes', 'active_episode.json'));
+      }
+      if (home) {
+        candidates.push(p.join(home, 'Library', 'Application Support', 'app.amverge', 'episodes', 'active_episode.json'));
+        candidates.push(p.join(home, '.local', 'share', 'app.amverge', 'episodes', 'active_episode.json'));
+      }
+
+      for (var i = 0; i < candidates.length; i++) {
+        if (window.FileSystem.fileExists(candidates[i])) {
+          return candidates[i];
+        }
+      }
+      return null;
+    },
+
+    _checkActiveEpisodeSync: function () {
+      var pointerPath = this._findActiveEpisodePointerPath();
+
+      if (!pointerPath) {
+        var hadPointer = this._activeEpisodePointer !== null;
+        this._activeEpisodePointer = null;
+        this._activeEpisodeKey = null;
+        if (window.App && window.App.updateAppBadge) {
+          window.App.updateAppBadge(0);
+        }
+        if (hadPointer && window.App && window.App._activeSource === 'app') {
+          window.App._appSavedState = null;
+          window.App.closeEpisode();
+        }
+        return;
+      }
+
+      var raw = window.FileSystem.readFile(pointerPath);
+      if (!raw) return;
+
+      try {
+        var pointer = JSON.parse(raw);
+        var prevKey = this._activeEpisodeKey;
+        var nextKey = [
+          pointer.episode_id || '',
+          pointer.manifest_path || '',
+          pointer.updated_at || 0,
+          pointer.scene_count || 0
+        ].join('|');
+
+        this._activeEpisodePointer = pointer;
+        this._activeEpisodeKey = nextKey;
+
+        if (window.App && window.App.updateAppBadge) {
+          window.App.updateAppBadge(pointer.scene_count || 0);
+        }
+
+        // If AMVerge App source pill is active, reload whenever the desktop episode changes or nothing is loaded yet
+        if (window.App && window.App._activeSource === 'app') {
+          var isEmpty = !window.App._currentScenes || window.App._currentScenes.length === 0;
+          if (nextKey !== prevKey || isEmpty) {
+            this.loadActiveDesktopEpisode({ silentToast: nextKey === prevKey && isEmpty });
+          }
+        }
+      } catch (e) {}
+    },
+
+    loadActiveDesktopEpisode: function (opts) {
+      if (!this._activeEpisodePointer) return false;
+      var p = this._activeEpisodePointer;
+      var manifestPath = p.manifest_path;
+      if (!manifestPath || !window.FileSystem || !window.FileSystem.fileExists(manifestPath)) {
+        return false;
+      }
+      var outputDir = window.FileSystem.path ?
+        window.FileSystem.path.dirname(manifestPath) : '';
+
+      return this.loadItem(manifestPath, outputDir, opts);
     },
 
     addRun: function (videoPath, outputDir, sceneCount, method) {
@@ -191,39 +282,101 @@
       container.innerHTML = html;
     },
 
-    loadItem: function (manifestPath, outputDir) {
+    _pad4: function (n) {
+      var str = String(n);
+      while (str.length < 4) str = '0' + str;
+      return str;
+    },
+
+    /** `p` if it exists, else the same file name (or a fallback name) inside the episode folder */
+    _resolveEpisodeFile: function (p, outputDir, fallbackNames) {
+      var fs = window.FileSystem;
+      if (!fs || !fs.fileExists) return '';
+      if (p && fs.fileExists(p)) return p;
+      if (!outputDir || !fs.path) return '';
+
+      var names = [];
+      if (p) names.push(fs.getFileName(p));
+      for (var n = 0; n < (fallbackNames || []).length; n++) names.push(fallbackNames[n]);
+
+      var dirs = [fs.path.join(outputDir, 'scenes'), fs.path.join(outputDir, 'clips'), outputDir];
+      for (var i = 0; i < names.length; i++) {
+        if (!names[i]) continue;
+        for (var d = 0; d < dirs.length; d++) {
+          var candidate = fs.path.join(dirs[d], names[i]);
+          if (fs.fileExists(candidate)) return candidate;
+        }
+      }
+      return '';
+    },
+
+    loadItem: function (manifestPath, outputDir, opts) {
+      var silentToast = opts && opts.silentToast;
       if (manifestPath && window.FileSystem && window.FileSystem.fileExists(manifestPath)) {
         try {
           var raw = window.FileSystem.readFile(manifestPath);
           var manifest = JSON.parse(raw);
-          var scenes = manifest.scenes || [];
-          if (scenes.length > 0) {
-            // Remap scene paths if necessary
-            for (var i = 0; i < scenes.length; i++) {
-              if (scenes[i].clip_path && !window.FileSystem.fileExists(scenes[i].clip_path)) {
-                var fileName = window.FileSystem.getFileName(scenes[i].clip_path);
-                var localP = window.FileSystem.path.join(outputDir, fileName);
-                if (window.FileSystem.fileExists(localP)) {
-                  scenes[i].clip_path = localP;
-                  scenes[i].path = localP;
-                }
-              }
+          var rawScenes = (manifest.scenes && manifest.scenes.length > 0)
+            ? manifest.scenes
+            : (manifest.initialClips || []);
+
+          if (rawScenes.length > 0) {
+            var sourceVideo = (manifest.source && manifest.source.videoPath) || '';
+            var scenes = [];
+            for (var i = 0; i < rawScenes.length; i++) {
+              var s = rawScenes[i];
+              var sceneIdx = s.scene_index !== undefined ? s.scene_index : i;
+              var stem = 'scene_' + this._pad4(sceneIdx);
+
+              // the desktop manifest leaves clip_path null and puts the SOURCE video in `path`;
+              // treating that as the clip made every preview proxy the whole episode
+              var clip = s.clip_path || '';
+              if (!clip && s.path && !(sourceVideo && this._samePath(s.path, sourceVideo))) clip = s.path;
+              clip = this._resolveEpisodeFile(clip, outputDir, [stem + '.mp4']);
+
+              // thumbnails can point at an old storage root after a move, so fall back to scenes/scene_NNNN.jpg
+              var thumb = this._resolveEpisodeFile(s.thumbnail || '', outputDir, [stem + '.jpg']);
+
+              var startSec = s.start_sec !== undefined ? s.start_sec : (s.start || 0);
+              var endSec = s.end_sec !== undefined ? s.end_sec : (s.end || startSec);
+              scenes.push({
+                scene_index: s.scene_index !== undefined ? s.scene_index : i,
+                start_sec: startSec,
+                end_sec: endSec,
+                duration_sec: s.duration_sec !== undefined ? s.duration_sec : Math.max(0, endSec - startSec),
+                path: clip,
+                clip_path: clip || null,
+                original_path: s.original_path || sourceVideo,
+                clip_mode: s.clip_mode || '',
+                thumbnail: thumb,
+                original_file: s.original_file || (sourceVideo ? window.FileSystem.getFileName(sourceVideo) : '')
+              });
             }
+
             if (window.App) {
               window.App._currentScenes = scenes;
+              window.App._currentVideo = sourceVideo || null;
+              window.App._currentOutputDir = outputDir || null;
+              window.App._gridLive = false;
               window.ClipsPanel.loadScenes(scenes);
               document.getElementById('importArea').style.display = 'none';
               document.getElementById('scenePanel').style.display = '';
               window.ImportPanel.hide();
               window.App.switchTab('home');
-              window.showToast('Loaded ' + scenes.length + ' scenes from AMVerge App', 'success');
-              return;
+              if (!silentToast) {
+                window.showToast('Loaded ' + scenes.length + ' scenes from AMVerge App', 'success');
+              }
+              return true;
             }
           }
         } catch (e) {}
       }
 
-      this.reopen(outputDir);
+      if (outputDir && window.FileSystem && window.FileSystem.fileExists(outputDir)) {
+        this.reopen(outputDir);
+        return !!(window.App && window.App._currentScenes && window.App._currentScenes.length > 0);
+      }
+      return false;
     },
 
     reopen: function (outputDir) {

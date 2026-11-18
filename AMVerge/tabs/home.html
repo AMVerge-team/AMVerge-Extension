@@ -1,4 +1,20 @@
 <div id="page-home" class="page active">
+  <div class="source-pill-bar" id="sourcePillBar">
+    <div class="source-pill-group" id="sourcePillGroup" data-source="local" role="tablist" aria-label="Scene source">
+      <span class="source-pill-thumb" aria-hidden="true"></span>
+      <button type="button" class="source-pill active" id="sourcePillLocal" role="tab" aria-selected="true" onclick="App.setSourceMode('local')" title="Detect scenes directly in After Effects">
+        <svg class="icon"><use href="#icon-zap"/></svg>
+        <span>AE Local</span>
+      </button>
+      <button type="button" class="source-pill" id="sourcePillApp" role="tab" aria-selected="false" onclick="App.setSourceMode('app')" title="Live sync with the AMVerge desktop app">
+        <span class="source-pill-live" aria-hidden="true"></span>
+        <svg class="icon"><use href="#icon-sync"/></svg>
+        <span>AMVerge App</span>
+        <span class="source-pill-count" id="sourceAppBadge" style="display:none">0</span>
+      </button>
+    </div>
+  </div>
+
   <div id="importArea" class="import-area">
     <div id="importIdle" class="import-idle">
       <span class="amverge-wordmark amverge-wordmark-full"><span class="wm-accent">AMV</span>erge</span>
