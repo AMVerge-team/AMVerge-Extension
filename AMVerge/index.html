@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="css/home.css">
   <link rel="stylesheet" href="css/settings.css">
   <link rel="stylesheet" href="css/history.css">
+  <link rel="stylesheet" href="css/changelog.css">
   <link rel="stylesheet" href="css/console.css">
   <link rel="stylesheet" href="css/setup.css">
   <link rel="stylesheet" href="css/common.css">
@@ -46,6 +47,7 @@
       <symbol id="icon-volume" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4z" fill="currentColor"/><path d="M15.5 9a4 4 0 010 6M18 6.5a7.5 7.5 0 010 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
       <symbol id="icon-volume-mute" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4z" fill="currentColor"/><path d="M16 9.5l5 5M21 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
       <symbol id="icon-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="icon-changelog" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M14 2v6h6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 13h8M8 17h5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
     </defs>
   </svg>
 
@@ -76,6 +78,9 @@
             <button class="sidebar-btn" data-page="history" data-label="History" onclick="App.switchTab('history')">
               <svg class="icon"><use href="#icon-history"/></svg>
             </button>
+            <button class="sidebar-btn" data-page="changelog" data-label="Changelog" onclick="App.switchTab('changelog')">
+              <svg class="icon"><use href="#icon-changelog"/></svg>
+            </button>
           </div>
         </div>
         <div class="sidebar-bottom">
@@ -98,6 +103,7 @@
         <div data-tab="console"></div>
         <div data-tab="settings"></div>
         <div data-tab="history"></div>
+        <div data-tab="changelog"></div>
       </div>
     </div>
   </div>
@@ -282,6 +288,7 @@
   <script src="js/components/cutProgressCard.js"></script>
   <script src="js/components/toolsSetup.js"></script>
   <script src="js/components/historyPanel.js"></script>
+  <script src="js/components/changelogPanel.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>
