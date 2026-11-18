@@ -7,6 +7,7 @@
     "fetch:uv": "node ./tools/fetch-uv.js",
     "build": "npm run fetch:uv && npm run build --prefix tools",
     "build:all": "npm run fetch:uv && npm run build:all --prefix tools",
-    "docs": "npm run docs --prefix tools"
+    "docs": "npm run docs --prefix tools",
+    "test": "node tools/test-sync.js"
   }
 }

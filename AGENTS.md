@@ -28,7 +28,8 @@ cd .. && npm run build:all
 
 Root `package.json` proxies to `tools/`. Commands: `build`, `build:2018|2020|2022`, `build:all`, `docs`.
 
-- No test framework. No lint/typecheck.
+- Test: `npm test` runs `tools/test-sync.js`, a Node assertion harness covering custom storage discovery, WebP desktop sync, source-range AE import, and setup/runtime behavior with mocked CEP/AE objects.
+- No lint/typecheck.
 - Build: copy source -> obfuscate JS -> compile JSXBIN -> patch manifest -> sign ZXP.
 
 ## Releasing
@@ -61,6 +62,7 @@ Optional secret `EXTENSION_CERT_P12_BASE64` (base64 of `tools/cert.p12`) keeps o
 ├── tools/
 │   ├── build.js                # Obfuscate -> JSXBIN -> patch manifest -> sign ZXP
 │   ├── installer.iss
+│   ├── test-sync.js               # Node sync/setup regression harness
 │   └── cert.p12
 └├── AMVerge/                    # <- the extension
 ├── CSXS/manifest.xml
@@ -149,6 +151,10 @@ stdout: JSON array of scene objects [{scene_index,start,end,duration,path,thumbn
 - `localStorage` keys: `amverge_*` (settings, setup_complete, setup_skipped)
 - Output: user-configurable, defaults to `~/Downloads/AMVerge/<video_stem>/`
 - Scene cache: `.npy` files in output dir (TransNetV2 only)
+- Desktop discovery: `fileSystem.js` merges `paths.json` and `ai_storage_path.txt`, including `runtime_dir`, `ai_config_dir`, `hf_home_dir`, and `episodes_storage_dir`. `getAppProcessEnv()` must be passed to every CLI spawn so moved config and model caches remain visible.
+- Manual fallbacks: `settings.appRuntimePath` (folder containing `pyenv`) and `settings.appEpisodesPath` (storage root or `episodes_storage`).
+- WebP sync: the desktop writes `sync_preview.json` beside `manifest.json`, mapping scene indexes to generated WebP and JPG files. `historyPanel.js` merges those into `webp_files` source ranges without proxying the whole source; `video_files` scenes with no cut remain pending re-encodes.
+- Setup: `toolsSetup.js` resolves Python 3.11+ and uses `AmvergeRuntime.install()` / `uv`, never `python -m pip` inside the app-managed env. The `edge` extra does not install torch.
 
 ## CEP Quirks
 

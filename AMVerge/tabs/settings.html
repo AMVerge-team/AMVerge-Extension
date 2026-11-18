@@ -9,6 +9,20 @@
           <button class="button button-small" onclick="App.browsePython()"><svg class="icon"><use href="#icon-folder"/></svg></button>
         </div>
       </div>
+      <div class="settings-row" title="Optional fallback when automatic desktop app discovery cannot find a moved runtime. Choose the folder containing pyenv.">
+        <span class="settings-label">App AI Runtime</span>
+        <div class="settings-control">
+          <input type="text" class="settings-text-input" id="settingsAppRuntimePath" placeholder="Auto-detect from AMVerge App" onchange="App.saveSettings()">
+          <button class="button button-small" onclick="App.browseAppRuntime()"><svg class="icon"><use href="#icon-folder"/></svg></button>
+        </div>
+      </div>
+      <div class="settings-row" title="Optional fallback for desktop episodes. Choose either the storage root or its episodes_storage folder.">
+        <span class="settings-label">App Episodes Storage</span>
+        <div class="settings-control">
+          <input type="text" class="settings-text-input" id="settingsAppEpisodesPath" placeholder="Auto-detect from AMVerge App" onchange="App.saveSettings()">
+          <button class="button button-small" onclick="App.browseAppEpisodes()"><svg class="icon"><use href="#icon-folder"/></svg></button>
+        </div>
+      </div>
       <div class="settings-row">
         <span class="settings-label">Output Directory</span>
         <div class="settings-control">

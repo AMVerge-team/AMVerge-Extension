@@ -51,6 +51,8 @@
       var home = fs.getHomeDir();
 
       if (process.env.AMVERGE_RUNTIME_DIR) return process.env.AMVERGE_RUNTIME_DIR;
+      var roots = fs.getRuntimeRoots();
+      if (roots.length) return roots[0];
       if (process.platform === 'win32') {
         var local = process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
         return path.join(local, 'AMVerge', 'runtime');
@@ -114,6 +116,7 @@
      */
     _distsForExtras: function (extras) {
       var map = {
+        edge: ['opencv-python-headless'],
         ml: ['transnetv2-pytorch', 'tqdm'],
         nelux: [NELUX_PIN_GPU_DECODE],
         depth: ['torchvision', 'opencv-python-headless'],
@@ -147,11 +150,9 @@
 
     /** environment every uv call runs with, matching the app's exactly */
     _uvEnv: function (runtimeDir) {
-      var path = window.FileSystem.path;
-      var env = {};
-      for (var k in process.env) {
-        if (process.env.hasOwnProperty(k)) env[k] = process.env[k];
-      }
+      var fs = window.FileSystem;
+      var path = fs.path;
+      var env = fs.getAppProcessEnv();
       env.UV_PYTHON_INSTALL_DIR = path.join(runtimeDir, 'python');
       env.UV_CACHE_DIR = path.join(runtimeDir, 'uv-cache');
       env.UV_PYTHON_PREFERENCE = 'only-managed';
@@ -234,7 +235,13 @@
           args.push('amverge[' + extras.join(',') + ']');
         }
 
-        args = args.concat(TORCH_FAMILY);
+        var needsTorch = wantNelux;
+        for (var i = 0; i < extras.length; i++) {
+          if (['ml', 'depth', 'interpolation', 'scout', 'upscale'].indexOf(extras[i]) !== -1) {
+            needsTorch = true;
+          }
+        }
+        if (needsTorch) args = args.concat(TORCH_FAMILY);
         if (wantNelux) {
           args.push(TORCH_PIN_GPU_DECODE, NELUX_PIN_GPU_DECODE);
         }

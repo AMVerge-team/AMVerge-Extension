@@ -56,6 +56,7 @@
 
     runCheck: function () {
       var s = this;
+      this._resolvedPython = null;
       this._showStep('check');
       var results = document.getElementById('setupCheckResults');
       results.innerHTML = '';
@@ -92,13 +93,15 @@
 
       var candidates = [];
 
-      // 1. App-managed AI Python environment if provisioned
+      if (window.App && window.App.settings && window.App.settings.pythonPath) {
+        candidates.push({ cmd: window.App.settings.pythonPath, args: [], isFile: true });
+      }
+
       if (fs.getAppAiPython) {
         var shared = fs.getAppAiPython();
         if (shared) candidates.push({ cmd: shared, args: [], isFile: true });
       }
 
-      // 2. Windows py launcher with version flags
       if (process.platform === 'win32') {
         candidates.push({ cmd: 'py', args: ['-3.13'], isFile: false });
         candidates.push({ cmd: 'py', args: ['-3.12'], isFile: false });
@@ -106,7 +109,6 @@
         candidates.push({ cmd: 'py', args: [], isFile: false });
       }
 
-      // 3. Standard binaries
       candidates.push({ cmd: 'python3.13', args: [], isFile: false });
       candidates.push({ cmd: 'python3.12', args: [], isFile: false });
       candidates.push({ cmd: 'python3.11', args: [], isFile: false });
@@ -154,7 +156,6 @@
         s._markCheck('python', 'pass', py.versionStr);
         this._addTimer(function () { s._checkAmverge(); }, 100);
       } else {
-        // Probe default python to give helpful error message if an older version exists
         var foundVer = '';
         try {
           var r = window.FileSystem.childProcess.spawnSync('python', ['--version'], { encoding: 'utf8', timeout: 5000, windowsHide: true });
@@ -176,14 +177,10 @@
       var baseArgs = py ? py.args.slice() : [];
 
       try {
-        var checkArgs = baseArgs.concat(['-m', 'pip', 'show', 'amverge']);
+        var checkArgs = baseArgs.concat(['-c', 'import importlib.metadata as m; print(m.version("amverge"))']);
         var result = window.FileSystem.childProcess.execFileSync(cmd, checkArgs, { encoding: 'utf8', timeout: 10000, windowsHide: true });
-        var lines = (result || '').split('\n');
-        var ver = '';
-        for (var i = 0; i < lines.length; i++) {
-          if (lines[i].indexOf('Version:') === 0) { ver = lines[i].trim(); break; }
-        }
-        s._markCheck('amverge', 'pass', ver || 'Installed');
+        var ver = (result || '').trim();
+        s._markCheck('amverge', 'pass', ver ? 'Version: ' + ver : 'Installed');
         this._addTimer(function () { s._checkFfmpeg(); }, 100);
       } catch (e) {
         s._markCheck('amverge', 'fail', 'Not installed');
@@ -239,7 +236,7 @@
       var amvergeOk = this._checkState.amverge;
       var installBtn = document.getElementById('setupInstallBtn');
       var continueBtn = document.getElementById('setupContinueBtn');
-      if (installBtn) installBtn.disabled = !(pythonOk && !amvergeOk);
+      if (installBtn) installBtn.disabled = !!amvergeOk;
       if (continueBtn) continueBtn.disabled = !(pythonOk && amvergeOk);
     },
 
@@ -257,35 +254,28 @@
       fill.style.width = '10%';
       status.textContent = 'Installing amverge package...';
 
-      var py = this._resolvePythonCandidate();
-      var cmd = py ? py.cmd : 'python';
-      var baseArgs = py ? py.args.slice() : [];
-      var installArgs = baseArgs.concat(['-m', 'pip', 'install', 'amverge[edge]']);
-
-      try {
-        var proc = window.FileSystem.childProcess.spawn(cmd, installArgs);
-        var buf = '';
-        proc.stdout.on('data', function (data) { buf += data.toString(); });
-        proc.stderr.on('data', function (data) { buf += data.toString(); });
-        proc.on('close', function (code) {
-          if (code === 0) {
-            fill.style.width = '100%';
-            status.textContent = 'amverge installed successfully';
-            s._addTimer(function () {
-              s._showStep('complete');
-              if (cb) cb(true);
-            }, 300);
-          } else {
-            status.textContent = 'Install failed. Try: pip install amverge';
-            dbg('error', 'Setup', buf);
+      window.AmvergeRuntime.install({ extras: ['edge'], gpu: false }, {
+        onStage: function (message) {
+          status.textContent = message;
+        },
+        onLine: function (message) {
+          dbg('debug', 'Setup', message);
+        },
+        onDone: function (ok, detail) {
+          if (!ok) {
+            status.textContent = 'Install failed: ' + detail;
+            dbg('error', 'Setup', detail);
+            return;
           }
-        });
-        proc.on('error', function (err) {
-          status.textContent = 'Error: ' + err.message;
-        });
-      } catch (e) {
-        status.textContent = 'Error: ' + e.message;
-      }
+          s._resolvedPython = null;
+          fill.style.width = '100%';
+          status.textContent = 'amverge installed successfully';
+          s._addTimer(function () {
+            s._showStep('complete');
+            if (cb) cb(true);
+          }, 300);
+        }
+      });
     },
 
     skip: function () {

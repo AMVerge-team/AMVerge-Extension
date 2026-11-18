@@ -16,6 +16,11 @@
   os = nodeRequire('os');
   childProcess = nodeRequire('child_process');
 
+  function appSetting(name) {
+    if (!window.App || !window.App.settings) return '';
+    return String(window.App.settings[name] || '').trim();
+  }
+
   var FileSystem = {
     fs: fs,
     path: path,
@@ -197,7 +202,6 @@
       }
     },
 
-    /** standard app-data directories where AMVerge Desktop writes pointer files */
     getAppDataDirs: function () {
       var path = this.path;
       var home = this.getHomeDir();
@@ -211,27 +215,49 @@
       ];
     },
 
-    /** read paths.json written by AMVerge Desktop, or null if absent */
     readAppPaths: function () {
       if (!fs || !path) return null;
-      try {
-        var dirs = this.getAppDataDirs();
-        for (var i = 0; i < dirs.length; i++) {
-          var p = path.join(dirs[i], 'paths.json');
-          if (fs.existsSync(p)) {
+      var result = null;
+      var dirs = this.getAppDataDirs();
+      for (var i = 0; i < dirs.length; i++) {
+        var p = path.join(dirs[i], 'paths.json');
+        if (this.fileExists(p)) {
+          try {
             var parsed = JSON.parse(fs.readFileSync(p, 'utf8'));
-            if (parsed && typeof parsed === 'object') return parsed;
+            if (parsed && typeof parsed === 'object') {
+              if (!result) result = {};
+              for (var key in parsed) {
+                if (parsed[key] && result[key] === undefined) result[key] = parsed[key];
+              }
+            }
+          } catch (e) {
+            dbg('warn', 'FileSystem', 'readAppPaths failed for ' + p + ': ' + e);
           }
         }
-      } catch (e) {
-        dbg('warn', 'FileSystem', 'readAppPaths failed: ' + e);
+        var pointerFile = path.join(dirs[i], 'ai_storage_path.txt');
+        if (this.fileExists(pointerFile)) {
+          try {
+            var root = fs.readFileSync(pointerFile, 'utf8').trim();
+            if (root) {
+              if (!result) result = {};
+              if (!result.ai_config_dir) result.ai_config_dir = path.join(root, 'config');
+              if (!result.hf_home_dir) result.hf_home_dir = path.join(root, 'hf-cache');
+              if (!result.runtime_dir) result.runtime_dir = path.join(root, 'runtime');
+            }
+          } catch (e) {}
+        }
       }
-      return null;
+      return result;
     },
 
-    /** resolved episodes_storage directory (custom from paths.json or default), or null */
     getAppEpisodesStorageDir: function () {
       var path = this.path;
+      var manual = appSetting('appEpisodesPath');
+      if (manual) {
+        if (this.fileExists(manual)) return manual;
+        var nested = path.join(manual, 'episodes_storage');
+        if (this.fileExists(nested)) return nested;
+      }
       var appPaths = this.readAppPaths();
       if (appPaths && appPaths.episodes_storage_dir && this.fileExists(appPaths.episodes_storage_dir)) {
         return appPaths.episodes_storage_dir;
@@ -242,6 +268,25 @@
         if (this.fileExists(candidate)) return candidate;
       }
       return null;
+    },
+
+    getAppProcessEnv: function () {
+      var env = {};
+      for (var key in process.env) {
+        if (process.env.hasOwnProperty(key)) env[key] = process.env[key];
+      }
+      var appPaths = this.readAppPaths();
+      if (appPaths) {
+        if (!env.AMVERGE_CONFIG_DIR && appPaths.ai_config_dir) {
+          env.AMVERGE_CONFIG_DIR = appPaths.ai_config_dir;
+        }
+        if (!env.HF_HOME && !env.HF_HUB_CACHE && appPaths.hf_home_dir) {
+          env.HF_HOME = appPaths.hf_home_dir;
+        }
+      }
+      env.PYTHONUTF8 = '1';
+      env.PYTHONIOENCODING = 'utf-8';
+      return env;
     },
 
     /** roots that can hold the shared AMVerge Python runtime, best first.
@@ -256,10 +301,11 @@
       var home = this.getHomeDir();
       var roots = [];
 
+      var manual = appSetting('appRuntimePath');
+      if (manual) roots.push(manual);
       var override = process.env.AMVERGE_RUNTIME_DIR;
       if (override) roots.push(override);
 
-      // Desktop app pointer files (supports custom AI storage locations)
       var appPaths = this.readAppPaths();
       if (appPaths && appPaths.runtime_dir) {
         roots.push(appPaths.runtime_dir);

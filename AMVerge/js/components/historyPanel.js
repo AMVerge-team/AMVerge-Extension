@@ -306,6 +306,21 @@
       return '';
     },
 
+    _readPreviewSync: function (outputDir) {
+      var previews = {};
+      if (!outputDir || !window.FileSystem || !window.FileSystem.path) return previews;
+      var syncPath = window.FileSystem.path.join(outputDir, 'sync_preview.json');
+      if (!window.FileSystem.fileExists(syncPath)) return previews;
+      try {
+        var parsed = JSON.parse(window.FileSystem.readFile(syncPath));
+        var items = parsed && parsed.previews ? parsed.previews : [];
+        for (var i = 0; i < items.length; i++) {
+          previews[String(items[i].scene_index)] = items[i];
+        }
+      } catch (e) {}
+      return previews;
+    },
+
     loadItem: function (manifestPath, outputDir, opts) {
       var silentToast = opts && opts.silentToast;
       if (manifestPath && window.FileSystem && window.FileSystem.fileExists(manifestPath)) {
@@ -318,6 +333,8 @@
 
           if (rawScenes.length > 0) {
             var sourceVideo = (manifest.source && manifest.source.videoPath) || '';
+            var webpEpisode = !!(manifest.source && manifest.source.importMethod === 'webp_files');
+            var previewSync = this._readPreviewSync(outputDir);
             var scenes = [];
             for (var i = 0; i < rawScenes.length; i++) {
               var s = rawScenes[i];
@@ -332,17 +349,24 @@
 
               // thumbnails can point at an old storage root after a move, so fall back to scenes/scene_NNNN.jpg
               var thumb = this._resolveEpisodeFile(s.thumbnail || '', outputDir, [stem + '.jpg']);
+              var preview = previewSync[String(sceneIdx)];
+              var webp = preview ? this._resolveEpisodeFile(preview.preview_webp_path || '', outputDir, []) : '';
+              var poster = preview ? this._resolveEpisodeFile(preview.preview_poster_path || '', outputDir, []) : '';
+              if (webp || poster) thumb = webp || poster;
 
               var startSec = s.start_sec !== undefined ? s.start_sec : (s.start || 0);
               var endSec = s.end_sec !== undefined ? s.end_sec : (s.end || startSec);
+              var sourceRange = webpEpisode && !clip && !!sourceVideo;
               scenes.push({
                 scene_index: s.scene_index !== undefined ? s.scene_index : i,
                 start_sec: startSec,
                 end_sec: endSec,
                 duration_sec: s.duration_sec !== undefined ? s.duration_sec : Math.max(0, endSec - startSec),
-                path: clip,
-                clip_path: clip || null,
+                path: sourceRange ? '' : clip,
+                clip_path: sourceRange ? null : (clip || null),
                 original_path: s.original_path || sourceVideo,
+                source_range: sourceRange,
+                preview_webp_path: webp,
                 clip_mode: s.clip_mode || '',
                 thumbnail: thumb,
                 original_file: s.original_file || (sourceVideo ? window.FileSystem.getFileName(sourceVideo) : '')

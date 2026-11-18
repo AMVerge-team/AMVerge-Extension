@@ -23,6 +23,8 @@
     populate: function (settings) {
       document.getElementById('settingsPythonPath').value = settings.pythonPath || '';
       document.getElementById('settingsOutputDir').value = settings.outputDir || '';
+      document.getElementById('settingsAppRuntimePath').value = settings.appRuntimePath || '';
+      document.getElementById('settingsAppEpisodesPath').value = settings.appEpisodesPath || '';
       var detection = document.getElementById('settingsDetectionMethod');
       detection.value = settings.detectionMethod || 'transnetv2_gpu';
       // assigning .value fires nothing, so the styled label has to be told

@@ -204,7 +204,10 @@
       dbg('info', 'Amverge', 'Spawning CLI: ' + cli.command + ' ' + args.join(' '));
 
       try {
-        this._proc = window.FileSystem.childProcess.spawn(cli.command, args, { windowsHide: true });
+        this._proc = window.FileSystem.childProcess.spawn(cli.command, args, {
+          windowsHide: true,
+          env: window.FileSystem.getAppProcessEnv()
+        });
       } catch (e) {
         if (this._onError) this._onError('Failed to spawn amverge: ' + e.message);
         return;

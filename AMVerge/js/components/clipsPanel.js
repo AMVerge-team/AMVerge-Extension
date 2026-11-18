@@ -160,7 +160,7 @@
         }
 
         var clipPath = s.clip_path || s.path || '';
-        var isPendingReencode = !clipPath;
+        var isPendingReencode = !clipPath && !s.source_range;
         if (isPendingReencode) {
           wrapper.classList.add('is-pending-reencode');
           wrapper.title = 'Waiting to re-encode';
