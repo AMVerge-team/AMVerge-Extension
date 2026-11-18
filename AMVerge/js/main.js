@@ -654,19 +654,8 @@
       }
     },
 
-    updateAppBadge: function (count) {
-      var badge = document.getElementById('sourceAppBadge');
-      var pillApp = document.getElementById('sourcePillApp');
-      // the live dot means the desktop app has an episode open right now
-      if (pillApp) pillApp.classList.toggle('has-live', count > 0);
-      if (!badge) return;
-      if (count > 0) {
-        badge.textContent = count > 999 ? '999+' : String(count);
-        badge.style.display = 'inline-flex';
-      } else {
-        badge.style.display = 'none';
-      }
-    },
+    // the pill no longer shows a live dot or scene count; kept because HistoryPanel's sync loop still calls it
+    updateAppBadge: function () {},
 
     /** back to the import screen, dropping the loaded episode.
      *
