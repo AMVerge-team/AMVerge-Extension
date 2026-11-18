@@ -1,70 +1,152 @@
 /* ====================
    SOURCE PILL SELECTOR (AE Local vs AMVerge App)
+   a segmented capsule: both halves share one width, and a glowing thumb
+   slides under whichever source is active
    ==================== */
 
 .source-pill-bar {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 10px 14px 4px 14px;
-  background: transparent;
+  padding: 10px 14px 6px;
   flex-shrink: 0;
 }
 
 .source-pill-group {
-  display: inline-flex;
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   align-items: center;
   padding: 3px;
-  background: rgba(18, 18, 18, 0.85);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  gap: 3px;
+  min-width: 248px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(8, 8, 8, 0.92), rgba(20, 20, 20, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.6),
+    0 1px 0 rgba(255, 255, 255, 0.04),
+    0 6px 18px rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.source-pill-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgb(var(--accent-rgb) / 0.34), rgb(var(--accent-rgb) / 0.16));
+  border: 1px solid rgb(var(--accent-rgb) / 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 0 14px rgb(var(--accent-rgb) / 0.28);
+  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+
+.source-pill-group[data-source="app"] .source-pill-thumb {
+  transform: translateX(100%);
 }
 
 .source-pill {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 4px 12px;
+  height: 26px;
+  padding: 0 14px;
   font-family: var(--font-ui);
   font-size: 11px;
-  font-weight: 500;
-  color: var(--text-dim);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.5);
   background: transparent;
   border: 0;
-  border-radius: var(--radius-full);
+  border-radius: 999px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  outline: none;
+  transition: color 0.18s ease;
 }
 
 .source-pill .icon {
   width: 12px;
   height: 12px;
+  opacity: 0.75;
+  transition: color 0.18s ease, opacity 0.18s ease;
 }
 
 .source-pill:hover {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.source-pill:focus-visible {
+  box-shadow: 0 0 0 2px rgb(var(--accent-rgb) / 0.6);
 }
 
 .source-pill.active {
   color: #fff;
-  background: rgb(var(--accent-rgb) / 0.2);
-  border: 1px solid rgb(var(--accent-rgb) / 0.4);
-  box-shadow: 0 0 10px rgb(var(--accent-rgb) / 0.15);
 }
 
 .source-pill.active .icon {
   color: var(--accent);
+  opacity: 1;
 }
 
-.source-pill .badge {
-  font-size: 9px;
-  padding: 1px 5px;
-  border-radius: var(--radius-full);
+/* live dot: the desktop app has an episode open right now */
+.source-pill-live {
+  display: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
   background: var(--accent);
-  color: #000;
+  box-shadow: 0 0 0 0 rgb(var(--accent-rgb) / 0.6);
+  animation: source-pill-pulse 1.8s ease-out infinite;
+}
+
+.source-pill.has-live .source-pill-live {
+  display: inline-block;
+}
+
+@keyframes source-pill-pulse {
+  0% { box-shadow: 0 0 0 0 rgb(var(--accent-rgb) / 0.55); }
+  70% { box-shadow: 0 0 0 5px rgb(var(--accent-rgb) / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(var(--accent-rgb) / 0); }
+}
+
+/* scene count: a tiny capsule of its own */
+.source-pill .source-pill-count {
+  min-width: 18px;
+  height: 15px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 9px;
   font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.source-pill.active .source-pill-count {
+  color: #000;
+  background: var(--accent);
+  border-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .source-pill-thumb { transition: none; }
+  .source-pill-live { animation: none; }
 }
 
 /* ====================

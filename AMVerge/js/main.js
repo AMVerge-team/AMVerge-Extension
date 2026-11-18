@@ -585,13 +585,14 @@
       if (this._activeSource === mode) return;
 
       var prev = this._activeSource;
+      var activePtr = window.HistoryPanel && window.HistoryPanel._activeEpisodePointer;
       // Save current view state before switching
       var currentState = {
         scenes: this._currentScenes.slice(),
         video: this._currentVideo,
         outputDir: this._currentOutputDir,
-        scenePanelVisible: document.getElementById('scenePanel').style.display !== 'none',
-        importAreaVisible: document.getElementById('importArea').style.display !== 'none'
+        gridLive: !!this._gridLive,
+        pointerKey: prev === 'app' && window.HistoryPanel ? window.HistoryPanel._activeEpisodeKey : null
       };
 
       if (prev === 'local') {
@@ -604,32 +605,47 @@
 
       var pillLocal = document.getElementById('sourcePillLocal');
       var pillApp = document.getElementById('sourcePillApp');
-      if (pillLocal) pillLocal.classList.toggle('active', mode === 'local');
-      if (pillApp) pillApp.classList.toggle('active', mode === 'app');
+      var pillGroup = document.getElementById('sourcePillGroup');
+      if (pillGroup) pillGroup.setAttribute('data-source', mode);
+      if (pillLocal) {
+        pillLocal.classList.toggle('active', mode === 'local');
+        pillLocal.setAttribute('aria-selected', mode === 'local' ? 'true' : 'false');
+      }
+      if (pillApp) {
+        pillApp.classList.toggle('active', mode === 'app');
+        pillApp.setAttribute('aria-selected', mode === 'app' ? 'true' : 'false');
+      }
 
       if (mode === 'local') {
         if (this._localSavedState && this._localSavedState.scenes.length > 0) {
           this._currentScenes = this._localSavedState.scenes;
           this._currentVideo = this._localSavedState.video;
           this._currentOutputDir = this._localSavedState.outputDir;
+          this._gridLive = this._localSavedState.gridLive;
           window.ClipsPanel.loadScenes(this._currentScenes);
+          window.PreviewPanel.clearPreview();
           document.getElementById('importArea').style.display = 'none';
           document.getElementById('scenePanel').style.display = '';
+          window.ImportPanel.hide();
         } else {
           this.closeEpisode();
         }
       } else {
-        // App Sync Mode: attempt to load active desktop episode
+        // App Sync Mode: prefer live desktop pointer when present or changed
         var targetState = this._appSavedState;
-        if (targetState && targetState.scenes.length > 0) {
+        var ptrKey = window.HistoryPanel ? window.HistoryPanel._activeEpisodeKey : null;
+        if (targetState && targetState.scenes.length > 0 && (!activePtr || targetState.pointerKey === ptrKey)) {
           this._currentScenes = targetState.scenes;
           this._currentVideo = targetState.video;
           this._currentOutputDir = targetState.outputDir;
+          this._gridLive = false;
           window.ClipsPanel.loadScenes(this._currentScenes);
+          window.PreviewPanel.clearPreview();
           document.getElementById('importArea').style.display = 'none';
           document.getElementById('scenePanel').style.display = '';
+          window.ImportPanel.hide();
         } else if (window.HistoryPanel && window.HistoryPanel.loadActiveDesktopEpisode) {
-          var loaded = window.HistoryPanel.loadActiveDesktopEpisode();
+          var loaded = window.HistoryPanel.loadActiveDesktopEpisode({ silentToast: false });
           if (!loaded) {
             window.showToast('No active episode open in AMVerge Desktop App', 'info');
             this.closeEpisode();
@@ -640,10 +656,13 @@
 
     updateAppBadge: function (count) {
       var badge = document.getElementById('sourceAppBadge');
+      var pillApp = document.getElementById('sourcePillApp');
+      // the live dot means the desktop app has an episode open right now
+      if (pillApp) pillApp.classList.toggle('has-live', count > 0);
       if (!badge) return;
       if (count > 0) {
-        badge.textContent = String(count);
-        badge.style.display = 'inline-block';
+        badge.textContent = count > 999 ? '999+' : String(count);
+        badge.style.display = 'inline-flex';
       } else {
         badge.style.display = 'none';
       }

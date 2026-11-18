@@ -76,6 +76,36 @@
       return fs.path.join(dir, base + '.x264_480p30.preview.mp4');
     },
 
+    // dir -> its file names, listed once per episode so a 400-clip grid costs one readdir
+    _dirIndex: {},
+
+    /** a proxy already beside the clip: ours, or the desktop app's `<clip>.<tag>.preview.mp4` */
+    _existingProxyFor: function (clipPath) {
+      var own = this._proxyPathFor(clipPath);
+      if (this._nonEmptyFile(own)) return own;
+
+      var fs = window.FileSystem;
+      if (!fs || !fs.fs || !fs.path || !clipPath) return '';
+      var dir = fs.path.dirname(clipPath);
+      var key = this._norm(dir);
+      var names = this._dirIndex[key];
+      if (!names) {
+        try { names = fs.fs.readdirSync(dir); } catch (e) { names = []; }
+        this._dirIndex[key] = names;
+      }
+
+      // trailing dot so scene_0008 never matches scene_0080's proxy
+      var base = fs.path.basename(clipPath, fs.path.extname(clipPath)).toLowerCase() + '.';
+      for (var i = 0; i < names.length; i++) {
+        var n = names[i].toLowerCase();
+        if (n.indexOf(base) === 0 && /\.preview\.mp4$/.test(n) && n.indexOf('.tmp.') === -1) {
+          var p = fs.path.join(dir, names[i]);
+          if (this._nonEmptyFile(p)) return p;
+        }
+      }
+      return '';
+    },
+
     _nonEmptyFile: function (p) {
       var fs = window.FileSystem;
       if (!p || !fs || !fs.fs) return false;
@@ -103,6 +133,7 @@
       this._byNormPath = {};
       this._clips = [];
       this._resumePrewarm = null;
+      this._dirIndex = {};
 
       if (!scenes || !scenes.length) return;
 
@@ -112,15 +143,16 @@
       var toProbe = [];
       for (var i = 0; i < scenes.length; i++) {
         var p = scenes[i].clip_path || scenes[i].path || '';
-        if (!p) continue;
+        // one probe per file: scenes that all fall back to the source video must not queue it hundreds of times
+        if (!p || this._known[p]) continue;
         if (fs && fs.fileExists && !fs.fileExists(p)) continue;
         this._clips.push(p);
         this._known[p] = true;
         this._byNormPath[this._norm(p)] = p;
         // Skip probing clips whose preview proxy is already on disk, or Phase 2
         // re-encoded clips which smart_cut already wrote as 8-bit H.264 yuv420p
-        var diskProxy = this._proxyPathFor(p);
-        if (this._nonEmptyFile(diskProxy)) {
+        var diskProxy = this._existingProxyFor(p);
+        if (diskProxy) {
           this._cache[p] = diskProxy;
           this._playable[p] = false;
         } else if (scenes[i].clip_mode === 'reencode') {
@@ -162,8 +194,8 @@
         this._clips.push(p);
         this._known[p] = true;
         this._byNormPath[this._norm(p)] = p;
-        var diskProxy = this._proxyPathFor(p);
-        if (this._nonEmptyFile(diskProxy)) {
+        var diskProxy = this._existingProxyFor(p);
+        if (diskProxy) {
           this._cache[p] = diskProxy;
           this._playable[p] = false;
         } else if (scenes[i].clip_mode === 'reencode') {
@@ -183,8 +215,8 @@
       if (!this._known[clipPath]) return clipPath;
       if (this._cache[clipPath]) return this._cache[clipPath];
       // 0ms disk-cache fast path: if the proxy already exists beside the clip, use it
-      var diskProxy = this._proxyPathFor(clipPath);
-      if (this._nonEmptyFile(diskProxy)) {
+      var diskProxy = this._existingProxyFor(clipPath);
+      if (diskProxy) {
         this._cache[clipPath] = diskProxy;
         return diskProxy;
       }
@@ -579,8 +611,8 @@
     /** jump one clip ahead of the queue; over the cap it just waits for the prewarm pass */
     _buildNow: function (clipPath) {
       if (this._urgent[clipPath] || this._cache[clipPath]) return;
-      var diskProxy = this._proxyPathFor(clipPath);
-      if (this._nonEmptyFile(diskProxy)) {
+      var diskProxy = this._existingProxyFor(clipPath);
+      if (diskProxy) {
         this._resolve(clipPath, diskProxy);
         return;
       }
