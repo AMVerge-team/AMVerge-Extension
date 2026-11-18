@@ -197,6 +197,53 @@
       }
     },
 
+    /** standard app-data directories where AMVerge Desktop writes pointer files */
+    getAppDataDirs: function () {
+      var path = this.path;
+      var home = this.getHomeDir();
+      var roaming = process.env.APPDATA || path.join(home, 'AppData', 'Roaming');
+      var appSupport = path.join(home, 'Library', 'Application Support');
+      return [
+        path.join(roaming, 'app.amverge'),
+        path.join(appSupport, 'app.amverge'),
+        path.join(home, '.local', 'share', 'app.amverge'),
+        path.join(roaming, 'AMVerge')
+      ];
+    },
+
+    /** read paths.json written by AMVerge Desktop, or null if absent */
+    readAppPaths: function () {
+      if (!fs || !path) return null;
+      try {
+        var dirs = this.getAppDataDirs();
+        for (var i = 0; i < dirs.length; i++) {
+          var p = path.join(dirs[i], 'paths.json');
+          if (fs.existsSync(p)) {
+            var parsed = JSON.parse(fs.readFileSync(p, 'utf8'));
+            if (parsed && typeof parsed === 'object') return parsed;
+          }
+        }
+      } catch (e) {
+        dbg('warn', 'FileSystem', 'readAppPaths failed: ' + e);
+      }
+      return null;
+    },
+
+    /** resolved episodes_storage directory (custom from paths.json or default), or null */
+    getAppEpisodesStorageDir: function () {
+      var path = this.path;
+      var appPaths = this.readAppPaths();
+      if (appPaths && appPaths.episodes_storage_dir && this.fileExists(appPaths.episodes_storage_dir)) {
+        return appPaths.episodes_storage_dir;
+      }
+      var dirs = this.getAppDataDirs();
+      for (var i = 0; i < dirs.length; i++) {
+        var candidate = path.join(dirs[i], 'episodes', 'episodes_storage');
+        if (this.fileExists(candidate)) return candidate;
+      }
+      return null;
+    },
+
     /** roots that can hold the shared AMVerge Python runtime, best first.
      *
      * The shared location belongs to neither product, so whichever installed
@@ -211,6 +258,25 @@
 
       var override = process.env.AMVERGE_RUNTIME_DIR;
       if (override) roots.push(override);
+
+      // Desktop app pointer files (supports custom AI storage locations)
+      var appPaths = this.readAppPaths();
+      if (appPaths && appPaths.runtime_dir) {
+        roots.push(appPaths.runtime_dir);
+      }
+      var appDataDirs = this.getAppDataDirs();
+      for (var i = 0; i < appDataDirs.length; i++) {
+        var pointerFile = path.join(appDataDirs[i], 'ai_storage_path.txt');
+        if (this.fileExists(pointerFile)) {
+          try {
+            var customRoot = fs.readFileSync(pointerFile, 'utf8').trim();
+            if (customRoot) {
+              roots.push(path.join(customRoot, 'runtime'));
+              roots.push(customRoot);
+            }
+          } catch (e) {}
+        }
+      }
 
       var local = process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
       var roaming = process.env.APPDATA || path.join(home, 'AppData', 'Roaming');

@@ -29,14 +29,10 @@
         // Always check active_episode.json first so custom desktop storage paths still live-sync
         this._checkActiveEpisodeSync();
 
-        var appData = process.env.APPDATA || window.FileSystem.path.join(window.FileSystem.getHomeDir(), 'AppData', 'Roaming');
-        var baseDir = window.FileSystem.path.join(appData, 'app.amverge', 'episodes', 'episodes_storage');
-
-        if (!window.FileSystem.fileExists(baseDir)) {
-          var altDir = window.FileSystem.path.join(appData, 'AMVerge', 'episodes', 'episodes_storage');
-          if (window.FileSystem.fileExists(altDir)) baseDir = altDir;
-          else return;
-        }
+        var baseDir = window.FileSystem.getAppEpisodesStorageDir
+          ? window.FileSystem.getAppEpisodesStorageDir()
+          : null;
+        if (!baseDir) return;
 
         var dirs = window.FileSystem.fs.readdirSync(baseDir);
         var episodes = [];

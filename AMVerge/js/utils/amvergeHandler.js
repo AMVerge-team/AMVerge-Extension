@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
   var MAX_STAGE_BYTES = 4 * 1024 * 1024 * 1024;
 
   var AmvergeHandler = {
@@ -241,16 +241,24 @@
         stdoutBuf += data.toString();
       });
 
+      var spawnErrored = false;
+
       this._proc.on('error', function (err) {
+        spawnErrored = true;
         s._cleanup();
-        var errMsg = 'Process error: ' + err.message;
-        if (stderrLog.trim()) errMsg += ' - ' + stderrLog.trim();
+        var errMsg;
+        if (err && (err.code === 'ENOENT' || String(err.message).indexOf('ENOENT') !== -1)) {
+          errMsg = 'AMVerge CLI not found. Open AMVerge Desktop to install the AI runtime, or set the Python/CLI path in Extension Settings.';
+        } else {
+          errMsg = 'Process error: ' + err.message;
+          if (stderrLog.trim()) errMsg += ' - ' + stderrLog.trim();
+        }
         if (s._onError) s._onError(errMsg);
       });
 
       this._proc.on('close', function (code) {
         s._cleanup();
-        if (s._cancelling) return;
+        if (s._cancelling || spawnErrored) return;
 
         if (code !== 0) {
           var errMsg = 'amverge failed with exit code ' + code;
