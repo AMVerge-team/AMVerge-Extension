@@ -112,6 +112,9 @@
     },
 
     cancel: function () {
+      if (window.AmvergeRuntime && window.AmvergeRuntime.cancel) {
+        window.AmvergeRuntime.cancel();
+      }
       if (this._proc) {
         try { this._proc.kill(); } catch (e) { /* already gone */ }
         this._proc = null;

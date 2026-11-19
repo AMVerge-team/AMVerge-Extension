@@ -721,7 +721,10 @@
 
         try {
           proc = window.FileSystem.childProcess.spawn(
-            cli.command, cli.prefix.concat(args), { windowsHide: true });
+            cli.command, cli.prefix.concat(args), {
+              windowsHide: true,
+              env: window.FileSystem.getAppProcessEnv()
+            });
         } catch (e) {
           dbg('warn', 'Proxy', 'spawn failed (' + cli.command + '): ' + e.message);
           s._unsupported[cli.command] = true;

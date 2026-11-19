@@ -21,6 +21,9 @@
   var TORCH_FAMILY = ['torch', 'torchvision'];
 
   var AmvergeRuntime = {
+    _activeProc: null,
+    _cancelled: false,
+
     /** the bundled uv, falling back to the app's staged copy and then PATH */
     uvPath: function () {
       var fs = window.FileSystem;
@@ -51,6 +54,8 @@
       var home = fs.getHomeDir();
 
       if (process.env.AMVERGE_RUNTIME_DIR) return process.env.AMVERGE_RUNTIME_DIR;
+      var roots = fs.getRuntimeRoots();
+      if (roots.length) return roots[0];
       if (process.platform === 'win32') {
         var local = process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
         return path.join(local, 'AMVerge', 'runtime');
@@ -114,6 +119,7 @@
      */
     _distsForExtras: function (extras) {
       var map = {
+        edge: ['opencv-python-headless'],
         ml: ['transnetv2-pytorch', 'tqdm'],
         nelux: [NELUX_PIN_GPU_DECODE],
         depth: ['torchvision', 'opencv-python-headless'],
@@ -147,11 +153,9 @@
 
     /** environment every uv call runs with, matching the app's exactly */
     _uvEnv: function (runtimeDir) {
-      var path = window.FileSystem.path;
-      var env = {};
-      for (var k in process.env) {
-        if (process.env.hasOwnProperty(k)) env[k] = process.env[k];
-      }
+      var fs = window.FileSystem;
+      var path = fs.path;
+      var env = fs.getAppProcessEnv();
       env.UV_PYTHON_INSTALL_DIR = path.join(runtimeDir, 'python');
       env.UV_CACHE_DIR = path.join(runtimeDir, 'uv-cache');
       env.UV_PYTHON_PREFERENCE = 'only-managed';
@@ -172,6 +176,7 @@
       var line = cb.onLine || function () {};
       var stage = cb.onStage || function () {};
       var done = cb.onDone || function () {};
+      this._cancelled = false;
 
       if (!fs || !fs.childProcess) {
         done(false, 'Node child_process is unavailable.');
@@ -197,6 +202,7 @@
         (wantNelux && existing !== PYTHON_VERSION_GPU_DECODE);
 
       var finish = function (code, last) {
+        if (s._cancelled) return;
         if (code !== 0) {
           done(false, last || 'uv exited with code ' + code);
           return;
@@ -234,7 +240,13 @@
           args.push('amverge[' + extras.join(',') + ']');
         }
 
-        args = args.concat(TORCH_FAMILY);
+        var needsTorch = wantNelux;
+        for (var i = 0; i < extras.length; i++) {
+          if (['ml', 'depth', 'interpolation', 'scout', 'upscale'].indexOf(extras[i]) !== -1) {
+            needsTorch = true;
+          }
+        }
+        if (needsTorch) args = args.concat(TORCH_FAMILY);
         if (wantNelux) {
           args.push(TORCH_PIN_GPU_DECODE, NELUX_PIN_GPU_DECODE);
         }
@@ -272,6 +284,7 @@
     },
 
     _run: function (command, args, env, onLine, onClose) {
+      var s = this;
       var proc;
       var lastLine = '';
       try {
@@ -282,6 +295,8 @@
         onClose(-1, 'Could not start ' + command + ': ' + e.message);
         return;
       }
+
+      this._activeProc = proc;
 
       var onData = function (buf) {
         var lines = String(buf).split(/\r?\n/);
@@ -299,6 +314,7 @@
       proc.on('close', function (code) {
         if (settled) return;
         settled = true;
+        s._activeProc = null;
         onClose(code, lastLine);
       });
       // an 'error' event with no listener throws, and the caller would sit on a
@@ -306,8 +322,23 @@
       proc.on('error', function (err) {
         if (settled) return;
         settled = true;
+        s._activeProc = null;
         onClose(-1, command + ' failed to run: ' + err.message);
       });
+    },
+
+    cancel: function () {
+      this._cancelled = true;
+      var proc = this._activeProc;
+      this._activeProc = null;
+      if (!proc) return;
+      try {
+        if (process.platform === 'win32') {
+          window.FileSystem.childProcess.execSync('taskkill /F /T /PID ' + proc.pid, { windowsHide: true });
+        } else {
+          proc.kill('SIGTERM');
+        }
+      } catch (e) {}
     }
   };
 

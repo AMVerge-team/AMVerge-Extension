@@ -16,6 +16,11 @@
   os = nodeRequire('os');
   childProcess = nodeRequire('child_process');
 
+  function appSetting(name) {
+    if (!window.App || !window.App.settings) return '';
+    return String(window.App.settings[name] || '').trim();
+  }
+
   var FileSystem = {
     fs: fs,
     path: path,
@@ -85,6 +90,12 @@
       } catch (e) {
         dbg('warn', 'FileSystem', 'Could not fully delete ' + folderPath + ': ' + e.message);
       }
+    },
+
+    fileUrl: function (filePath) {
+      return 'file:///' + encodeURI(String(filePath || '').replace(/\\/g, '/'))
+        .replace(/#/g, '%23')
+        .replace(/\?/g, '%3F');
     },
 
     getExtension: function (filePath) {
@@ -197,6 +208,96 @@
       }
     },
 
+    getAppDataDirs: function () {
+      var path = this.path;
+      var home = this.getHomeDir();
+      var roaming = process.env.APPDATA || path.join(home, 'AppData', 'Roaming');
+      var appSupport = path.join(home, 'Library', 'Application Support');
+      return [
+        path.join(roaming, 'app.amverge'),
+        path.join(appSupport, 'app.amverge'),
+        path.join(home, '.local', 'share', 'app.amverge'),
+        path.join(roaming, 'AMVerge')
+      ];
+    },
+
+    readAppPaths: function () {
+      if (!fs || !path) return null;
+      var result = null;
+      var dirs = this.getAppDataDirs();
+      for (var i = 0; i < dirs.length; i++) {
+        var p = path.join(dirs[i], 'paths.json');
+        if (this.fileExists(p)) {
+          try {
+            var parsed = JSON.parse(fs.readFileSync(p, 'utf8'));
+            if (parsed && typeof parsed === 'object') {
+              if (!result) result = {};
+              for (var key in parsed) {
+                if (parsed[key] && result[key] === undefined) result[key] = parsed[key];
+              }
+            }
+          } catch (e) {
+            dbg('warn', 'FileSystem', 'readAppPaths failed for ' + p + ': ' + e);
+          }
+        }
+        var pointerFile = path.join(dirs[i], 'ai_storage_path.txt');
+        if (this.fileExists(pointerFile)) {
+          try {
+            var root = fs.readFileSync(pointerFile, 'utf8').trim();
+            if (root) {
+              if (!result) result = {};
+              if (!result.ai_config_dir) result.ai_config_dir = path.join(root, 'config');
+              if (!result.hf_home_dir) result.hf_home_dir = path.join(root, 'hf-cache');
+              if (!result.runtime_dir) result.runtime_dir = path.join(root, 'runtime');
+            }
+          } catch (e) {}
+        }
+      }
+      return result;
+    },
+
+    getAppEpisodesStorageDir: function () {
+      var path = this.path;
+      var manual = appSetting('appEpisodesPath');
+      if (manual) {
+        if (this.fileExists(manual)) return manual;
+        var nested = path.join(manual, 'episodes_storage');
+        if (this.fileExists(nested)) return nested;
+      }
+      var appPaths = this.readAppPaths();
+      if (appPaths && appPaths.episodes_storage_dir && this.fileExists(appPaths.episodes_storage_dir)) {
+        return appPaths.episodes_storage_dir;
+      }
+      var dirs = this.getAppDataDirs();
+      for (var i = 0; i < dirs.length; i++) {
+        var candidate = path.join(dirs[i], 'episodes', 'episodes_storage');
+        if (this.fileExists(candidate)) return candidate;
+      }
+      return null;
+    },
+
+    getAppProcessEnv: function () {
+      var env = {};
+      for (var key in process.env) {
+        if (process.env.hasOwnProperty(key)) env[key] = process.env[key];
+      }
+      var appPaths = this.readAppPaths();
+      if (appPaths) {
+        if (!env.AMVERGE_CONFIG_DIR && appPaths.ai_config_dir) {
+          env.AMVERGE_CONFIG_DIR = appPaths.ai_config_dir;
+        }
+        if (!env.HF_HOME && !env.HF_HUB_CACHE && appPaths.hf_home_dir) {
+          env.HF_HOME = appPaths.hf_home_dir;
+        }
+        if (!env.AMVERGE_SCENE_SCOUT_DIR && appPaths.scene_scout_dir) {
+          env.AMVERGE_SCENE_SCOUT_DIR = appPaths.scene_scout_dir;
+        }
+      }
+      env.PYTHONUTF8 = '1';
+      env.PYTHONIOENCODING = 'utf-8';
+      return env;
+    },
+
     /** roots that can hold the shared AMVerge Python runtime, best first.
      *
      * The shared location belongs to neither product, so whichever installed
@@ -209,8 +310,28 @@
       var home = this.getHomeDir();
       var roots = [];
 
+      var manual = appSetting('appRuntimePath');
+      if (manual) roots.push(manual);
       var override = process.env.AMVERGE_RUNTIME_DIR;
       if (override) roots.push(override);
+
+      var appPaths = this.readAppPaths();
+      if (appPaths && appPaths.runtime_dir) {
+        roots.push(appPaths.runtime_dir);
+      }
+      var appDataDirs = this.getAppDataDirs();
+      for (var i = 0; i < appDataDirs.length; i++) {
+        var pointerFile = path.join(appDataDirs[i], 'ai_storage_path.txt');
+        if (this.fileExists(pointerFile)) {
+          try {
+            var customRoot = fs.readFileSync(pointerFile, 'utf8').trim();
+            if (customRoot) {
+              roots.push(path.join(customRoot, 'runtime'));
+              roots.push(customRoot);
+            }
+          } catch (e) {}
+        }
+      }
 
       var local = process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
       var roaming = process.env.APPDATA || path.join(home, 'AppData', 'Roaming');

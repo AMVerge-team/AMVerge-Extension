@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
   var MAX_STAGE_BYTES = 4 * 1024 * 1024 * 1024;
 
   var AmvergeHandler = {
@@ -41,6 +41,8 @@
 
       var method = opts.method || 'keyframe';
       var cli = opts.cli || { command: opts.pythonPath || 'python', prefix: ['-m', 'amverge'] };
+      var candidates = Array.isArray(cli) ? cli : [cli];
+      if (!candidates.length) candidates = [{ command: 'python', prefix: ['-m', 'amverge'] }];
 
       if (!window.FileSystem || !window.FileSystem.childProcess) {
         if (this._onError) this._onError('FileSystem not available');
@@ -54,7 +56,7 @@
           s._cleanup();
           return;
         }
-        s._runDetect(inputPath, method, cli, opts);
+        s._runDetect(inputPath, method, candidates, opts);
       });
     },
 
@@ -187,8 +189,13 @@
       return false;
     },
 
-    _runDetect: function (videoPath, method, cli, extraOpts) {
+    _runDetect: function (videoPath, method, candidates, extraOpts) {
       var s = this;
+      if (!candidates.length) {
+        if (this._onError) this._onError('AMVerge CLI not found. Open AMVerge Desktop to install the AI runtime, or set the Python/CLI path in Extension Settings.');
+        return;
+      }
+      var cli = candidates[0];
       var cliMethod = (method === 'transnetv2_gpu' || method === 'transnetv2') ? 'transnetv2' : 'keyframe';
       var args = cli.prefix.concat(['detect', '--method', cliMethod]);
 
@@ -204,8 +211,15 @@
       dbg('info', 'Amverge', 'Spawning CLI: ' + cli.command + ' ' + args.join(' '));
 
       try {
-        this._proc = window.FileSystem.childProcess.spawn(cli.command, args, { windowsHide: true });
+        this._proc = window.FileSystem.childProcess.spawn(cli.command, args, {
+          windowsHide: true,
+          env: window.FileSystem.getAppProcessEnv()
+        });
       } catch (e) {
+        if (e && (e.code === 'ENOENT' || String(e.message).indexOf('ENOENT') !== -1) && candidates.length > 1) {
+          this._runDetect(videoPath, method, candidates.slice(1), extraOpts);
+          return;
+        }
         if (this._onError) this._onError('Failed to spawn amverge: ' + e.message);
         return;
       }
@@ -241,16 +255,33 @@
         stdoutBuf += data.toString();
       });
 
+      var spawnErrored = false;
+      var fallbackStarted = false;
+
       this._proc.on('error', function (err) {
+        spawnErrored = true;
+        var missing = err && (err.code === 'ENOENT' || String(err.message).indexOf('ENOENT') !== -1);
+        if (missing && candidates.length > 1) {
+          fallbackStarted = true;
+          s._cleanup();
+          s._runDetect(videoPath, method, candidates.slice(1), extraOpts);
+          return;
+        }
         s._cleanup();
-        var errMsg = 'Process error: ' + err.message;
-        if (stderrLog.trim()) errMsg += ' - ' + stderrLog.trim();
+        var errMsg;
+        if (missing) {
+          errMsg = 'AMVerge CLI not found. Open AMVerge Desktop to install the AI runtime, or set the Python/CLI path in Extension Settings.';
+        } else {
+          errMsg = 'Process error: ' + err.message;
+          if (stderrLog.trim()) errMsg += ' - ' + stderrLog.trim();
+        }
         if (s._onError) s._onError(errMsg);
       });
 
       this._proc.on('close', function (code) {
+        if (fallbackStarted) return;
         s._cleanup();
-        if (s._cancelling) return;
+        if (s._cancelling || spawnErrored) return;
 
         if (code !== 0) {
           var errMsg = 'amverge failed with exit code ' + code;

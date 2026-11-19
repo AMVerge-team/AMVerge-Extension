@@ -13,6 +13,24 @@
 
   var CHANGELOG = [
     {
+      version: '1.2.1',
+      date: '2026-11-19',
+      title: 'Moved storage and WebP sync fixes',
+      added: [
+        'Automatic discovery of moved desktop runtime, episodes, CLI config, and Hugging Face storage, plus manual runtime and episodes overrides in Settings.',
+        'Desktop WebP episodes now sync their generated WebP and JPG previews through per-episode sync metadata.'
+      ],
+      fixed: [
+        'WebP-mode desktop episodes load as source ranges instead of empty pending re-encode tiles, and selected ranges import into AE trimmed and sequential.',
+        'The setup wizard requires Python 3.11+, works with app-managed uv environments without pip, and only downloads PyTorch for features that need it.',
+        'Detection, preview proxies, diagnostics, and runtime installs all inherit the moved CLI config and model cache.',
+        'Live sync reloads when manifests or previews change, history cache follows root changes, and paths containing # or ? load correctly.',
+        'Missing CLI executables fall through to the next candidate, and AI install Cancel now stops the real process tree.',
+        'The batch installer stages and verifies files, uses the same destination as the EXE updater, and returns failure instead of false success.',
+        'Auto-update stops active detection and preview jobs before replacing extension files.'
+      ]
+    },
+    {
       version: '1.2.0',
       date: '2026-11-18',
       title: 'Desktop app sync and one-click updates',

@@ -3,6 +3,8 @@
     settings: {
       pythonPath: '',
       outputDir: '',
+      appRuntimePath: '',
+      appEpisodesPath: '',
       detectionMethod: 'keyframe_detection',
       layerPrefix: 'AMVerge_',
       autoScale: true,
@@ -399,7 +401,7 @@
         // unset by default, which the handler reads as "use NVDEC if the shared
         // environment has it". set it to 'ffmpeg' to force the software path
         decodeMethod: this.settings.decodeMethod || '',
-        cli: this._resolveCli()
+        cli: this._resolveCliCandidates()
       }, {
         onProgress: function (pct, msg, stage) {
           window.ImportPanel.setProgress(pct, msg);
@@ -692,6 +694,7 @@
 
       this._importedCount = 0;
       var total = selected.length;
+      var timelineStart = 0;
 
       function importNext(i) {
         if (i >= selected.length) {
@@ -701,7 +704,8 @@
         }
 
         var scene = selected[i];
-        var clipPath = scene.clip_path || scene.path || '';
+        var clipPath = scene.clip_path || scene.path ||
+          (scene.source_range ? (scene.original_path || s._currentVideo || '') : '');
         dbg('debug', 'App', 'Scene ' + i + ' clip_path=' + (scene.clip_path || 'null') + ' path=' + (scene.path || 'null'));
         if (!clipPath) {
           importNext(i + 1);
@@ -715,6 +719,10 @@
         var autoScale = s.settings.autoScale !== false;
         var offset = i > 0;
         var prevDuration = i > 0 ? (selected[i - 1].end_sec || selected[i - 1].end || 0) - (selected[i - 1].start_sec || selected[i - 1].start || 0) : 0;
+        var sceneStart = scene.source_range ? (scene.start_sec || scene.start || 0) : 0;
+        var sceneDuration = Math.max(0, (scene.end_sec || scene.end || 0) - (scene.start_sec || scene.start || 0));
+        var layerStart = timelineStart;
+        timelineStart += sceneDuration;
 
         dbg('debug', 'App', 'Importing scene ' + i + ' path=' + clipPath);
 
@@ -733,7 +741,7 @@
             }
             importNext(i + 1);
           }
-          window.__adobe_cep__.evalScript('importClipToAE("' + escapedPath + '","' + escapedName + '",' + (autoScale ? 'true' : 'false') + ',' + (offset ? 'true' : 'false') + ',' + prevDuration + ')', finish);
+          window.__adobe_cep__.evalScript('importClipToAE("' + escapedPath + '","' + escapedName + '",' + (autoScale ? 'true' : 'false') + ',' + (offset ? 'true' : 'false') + ',' + prevDuration + ',' + sceneStart + ',' + sceneDuration + ',' + layerStart + ')', finish);
           setTimeout(function () { finish(null); }, 30000);
         } else {
           dbg('warn', 'App', 'AE bridge not available');
@@ -755,6 +763,8 @@
     saveSettings: function () {
       this.settings.pythonPath = document.getElementById('settingsPythonPath').value;
       this.settings.outputDir = document.getElementById('settingsOutputDir').value;
+      this.settings.appRuntimePath = document.getElementById('settingsAppRuntimePath').value;
+      this.settings.appEpisodesPath = document.getElementById('settingsAppEpisodesPath').value;
       this.settings.detectionMethod = document.getElementById('settingsDetectionMethod').value;
       this.settings.layerPrefix = document.getElementById('settingsLayerPrefix').value;
       this.settings.autoScale = document.getElementById('settingsAutoScale').checked;
@@ -832,7 +842,7 @@
       img.style.filter = blur;
 
       var isVideo = /\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(mediaPath);
-      var fileUrl = 'file:///' + encodeURI(mediaPath.replace(/\\/g, '/'));
+      var fileUrl = window.FileSystem.fileUrl(mediaPath);
 
       if (!isVideo) {
         img.src = fileUrl;
@@ -903,7 +913,7 @@
             dispose();
             return;
           }
-          applySrc('file:///' + encodeURI(outFile.replace(/\\/g, '/')));
+          applySrc(window.FileSystem.fileUrl(outFile));
         });
       };
 
@@ -1210,6 +1220,23 @@
       }
     },
 
+    browseAppRuntime: function () {
+      var dir = window.FileSystem.chooseFolder('Select the AMVerge AI runtime folder');
+      if (dir) {
+        document.getElementById('settingsAppRuntimePath').value = dir;
+        this.saveSettings();
+      }
+    },
+
+    browseAppEpisodes: function () {
+      var dir = window.FileSystem.chooseFolder('Select the AMVerge episodes storage folder');
+      if (dir) {
+        document.getElementById('settingsAppEpisodesPath').value = dir;
+        this.saveSettings();
+        if (window.HistoryPanel) window.HistoryPanel.syncFromDesktopApp();
+      }
+    },
+
     // --- Diagnostics ---
     /* report on the interpreter detection actually uses.*/
     runDoctor: function () {
@@ -1219,7 +1246,10 @@
       var python = this._resolvePython();
       var run = function (args, timeout) {
         var res = window.FileSystem.childProcess.spawnSync(python, args, {
-          encoding: 'utf8', timeout: timeout || 10000, windowsHide: true
+          encoding: 'utf8',
+          timeout: timeout || 10000,
+          windowsHide: true,
+          env: window.FileSystem.getAppProcessEnv()
         });
         if (!res || res.error || res.status !== 0) return null;
         return ((res.stdout || '') + (res.stderr || '')).trim();
@@ -1337,11 +1367,14 @@
       window.StorageManager.removeItem('workflow_mode');
       window.StorageManager.removeItem('settings');
       window.StorageManager.removeItem('history');
+      if (window.ToolsSetup) window.ToolsSetup._resolvedPython = null;
 
       // Reset App state
       this.settings = {
         pythonPath: '',
         outputDir: '',
+        appRuntimePath: '',
+        appEpisodesPath: '',
         detectionMethod: 'keyframe_detection',
         layerPrefix: 'AMVerge_',
         autoScale: true,

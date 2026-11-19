@@ -13,7 +13,7 @@ function amvergeJson(ok, message, filePath, name) {
 }
 
 // Import a scene clip into AE - individual params
-function importClipToAE(filePath, layerName, autoScale, offset, prevDuration) {
+function importClipToAE(filePath, layerName, autoScale, offset, prevDuration, sourceIn, sourceDuration, timelineStart) {
   try {
     if (!app.project) {
       return amvergeJson(false, "No project open");
@@ -88,6 +88,14 @@ function importClipToAE(filePath, layerName, autoScale, offset, prevDuration) {
       layer.name = layerName;
     }
 
+    if (typeof timelineStart !== "number") timelineStart = offset ? prevDuration : 0;
+    if (typeof sourceIn !== "number" || sourceIn < 0) sourceIn = 0;
+    layer.startTime = timelineStart - sourceIn;
+    if (typeof sourceDuration === "number" && sourceDuration > 0) {
+      layer.inPoint = timelineStart;
+      layer.outPoint = timelineStart + sourceDuration;
+    }
+
     // Auto-scale to comp dimensions while preserving aspect ratio
     if (autoScale !== false && footage.width > 0 && footage.height > 0) {
       var scaleX = (comp.width / footage.width) * 100;
@@ -112,7 +120,7 @@ function importSceneToAE(jsonStr) {
     return amvergeJson(false, "Invalid JSON input");
   }
 
-  return importClipToAE(data.filePath, data.layerName, data.autoScale, data.offset, data.prevDuration);
+  return importClipToAE(data.filePath, data.layerName, data.autoScale, data.offset, data.prevDuration, data.sourceIn, data.sourceDuration, data.timelineStart);
 }
 
 // Get selected layer info from AE

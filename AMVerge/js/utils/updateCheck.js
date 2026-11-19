@@ -395,6 +395,8 @@
       }
 
       function runInstaller() {
+        if (window.PreviewProxy) window.PreviewProxy.cancel();
+        if (window.AmvergeHandler) window.AmvergeHandler.cancel();
         settled = true;
         // the installer is PrivilegesRequired=admin, so Windows asks first: say so instead of "silent"
         s._setBanner('Approve the Windows prompt to install ' + version + '...', 'Installing...', STATE_BUSY, true);

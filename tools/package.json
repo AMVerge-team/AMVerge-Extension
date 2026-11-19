@@ -6,7 +6,8 @@
   "scripts": {
     "build": "node build.js",
     "build:all": "node build.js && node generate-docs.js",
-    "docs": "node generate-docs.js"
+    "docs": "node generate-docs.js",
+    "test": "node test-sync.js"
   },
   "devDependencies": {
     "javascript-obfuscator": "^5.4.3",

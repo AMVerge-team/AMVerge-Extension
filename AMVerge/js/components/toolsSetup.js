@@ -56,6 +56,7 @@
 
     runCheck: function () {
       var s = this;
+      this._resolvedPython = null;
       this._showStep('check');
       var results = document.getElementById('setupCheckResults');
       results.innerHTML = '';
@@ -82,36 +83,104 @@
       this._addTimer(function () { s._checkPython(); }, 200);
     },
 
+    _resolvedPython: null,
+
+    _resolvePythonCandidate: function () {
+      if (this._resolvedPython) return this._resolvedPython;
+
+      var fs = window.FileSystem;
+      if (!fs || !fs.childProcess) return null;
+
+      var candidates = [];
+
+      if (window.App && window.App.settings && window.App.settings.pythonPath) {
+        candidates.push({ cmd: window.App.settings.pythonPath, args: [], isFile: true });
+      }
+
+      if (fs.getAppAiPython) {
+        var shared = fs.getAppAiPython();
+        if (shared) candidates.push({ cmd: shared, args: [], isFile: true });
+      }
+
+      if (process.platform === 'win32') {
+        candidates.push({ cmd: 'py', args: ['-3.13'], isFile: false });
+        candidates.push({ cmd: 'py', args: ['-3.12'], isFile: false });
+        candidates.push({ cmd: 'py', args: ['-3.11'], isFile: false });
+        candidates.push({ cmd: 'py', args: [], isFile: false });
+      }
+
+      candidates.push({ cmd: 'python3.13', args: [], isFile: false });
+      candidates.push({ cmd: 'python3.12', args: [], isFile: false });
+      candidates.push({ cmd: 'python3.11', args: [], isFile: false });
+      candidates.push({ cmd: 'python3', args: [], isFile: false });
+      candidates.push({ cmd: 'python', args: [], isFile: false });
+
+      for (var i = 0; i < candidates.length; i++) {
+        var c = candidates[i];
+        if (c.isFile && !fs.fileExists(c.cmd)) continue;
+
+        try {
+          var checkArgs = c.args.concat(['--version']);
+          var res = fs.childProcess.spawnSync(c.cmd, checkArgs, {
+            encoding: 'utf8', timeout: 5000, windowsHide: true
+          });
+          var out = ((res.stdout || '') + (res.stderr || '')).trim();
+          var match = out.match(/Python\s+([0-9]+)\.([0-9]+)/i);
+          if (match) {
+            var major = parseInt(match[1], 10);
+            var minor = parseInt(match[2], 10);
+            if (major === 3 && minor >= 11) {
+              this._resolvedPython = {
+                cmd: c.cmd,
+                args: c.args,
+                versionStr: out
+              };
+              return this._resolvedPython;
+            }
+          }
+        } catch (e) {}
+      }
+
+      return null;
+    },
+
     _checkPython: function () {
       var s = this;
       if (!window.FileSystem || !window.FileSystem.childProcess) {
         this._markCheck('python', 'fail', 'No Node.js access');
         return;
       }
-      try {
-        var result = window.FileSystem.childProcess.spawnSync('python', ['--version'], { encoding: 'utf8', timeout: 5000, windowsHide: true });
-        var ver = ((result.stdout || '') + (result.stderr || '')).trim();
-        if (ver.indexOf('Python 3.') === 0) {
-          s._markCheck('python', 'pass', ver);
-          this._addTimer(function () { s._checkAmverge(); }, 100);
+
+      var py = this._resolvePythonCandidate();
+      if (py) {
+        s._markCheck('python', 'pass', py.versionStr);
+        this._addTimer(function () { s._checkAmverge(); }, 100);
+      } else {
+        var foundVer = '';
+        try {
+          var r = window.FileSystem.childProcess.spawnSync('python', ['--version'], { encoding: 'utf8', timeout: 5000, windowsHide: true });
+          foundVer = ((r.stdout || '') + (r.stderr || '')).trim();
+        } catch (e) {}
+
+        if (foundVer) {
+          s._markCheck('python', 'fail', foundVer + ' (requires Python 3.11+)');
         } else {
-          s._markCheck('python', 'fail', ver + ': need Python 3.11+');
+          s._markCheck('python', 'fail', 'Not found (requires Python 3.11+)');
         }
-      } catch (e) {
-        s._markCheck('python', 'fail', 'Not found');
       }
     },
 
     _checkAmverge: function () {
       var s = this;
+      var py = this._resolvePythonCandidate();
+      var cmd = py ? py.cmd : 'python';
+      var baseArgs = py ? py.args.slice() : [];
+
       try {
-        var result = window.FileSystem.childProcess.execFileSync('python', ['-m', 'pip', 'show', 'amverge'], { encoding: 'utf8', timeout: 10000, windowsHide: true });
-        var lines = (result || '').split('\n');
-        var ver = '';
-        for (var i = 0; i < lines.length; i++) {
-          if (lines[i].indexOf('Version:') === 0) { ver = lines[i].trim(); break; }
-        }
-        s._markCheck('amverge', 'pass', ver || 'Installed');
+        var checkArgs = baseArgs.concat(['-c', 'import importlib.metadata as m; print(m.version("amverge"))']);
+        var result = window.FileSystem.childProcess.execFileSync(cmd, checkArgs, { encoding: 'utf8', timeout: 10000, windowsHide: true });
+        var ver = (result || '').trim();
+        s._markCheck('amverge', 'pass', ver ? 'Version: ' + ver : 'Installed');
         this._addTimer(function () { s._checkFfmpeg(); }, 100);
       } catch (e) {
         s._markCheck('amverge', 'fail', 'Not installed');
@@ -132,8 +201,13 @@
 
     _checkGpu: function () {
       var s = this;
+      var py = this._resolvePythonCandidate();
+      var cmd = py ? py.cmd : 'python';
+      var baseArgs = py ? py.args.slice() : [];
+
       try {
-        var result = window.FileSystem.childProcess.execFileSync('python', ['-c', 'import torch; print(torch.cuda.is_available())'], { encoding: 'utf8', timeout: 10000, windowsHide: true });
+        var checkArgs = baseArgs.concat(['-c', 'import torch; print(torch.cuda.is_available())']);
+        var result = window.FileSystem.childProcess.execFileSync(cmd, checkArgs, { encoding: 'utf8', timeout: 10000, windowsHide: true });
         var avail = (result || '').trim();
         if (avail === 'True') {
           s._markCheck('gpu', 'pass', 'CUDA available');
@@ -162,7 +236,7 @@
       var amvergeOk = this._checkState.amverge;
       var installBtn = document.getElementById('setupInstallBtn');
       var continueBtn = document.getElementById('setupContinueBtn');
-      if (installBtn) installBtn.disabled = !(pythonOk && !amvergeOk);
+      if (installBtn) installBtn.disabled = !!amvergeOk;
       if (continueBtn) continueBtn.disabled = !(pythonOk && amvergeOk);
     },
 
@@ -180,30 +254,28 @@
       fill.style.width = '10%';
       status.textContent = 'Installing amverge package...';
 
-      try {
-        var proc = window.FileSystem.childProcess.spawn('python', ['-m', 'pip', 'install', 'amverge[edge]']);
-        var buf = '';
-        proc.stdout.on('data', function (data) { buf += data.toString(); });
-        proc.stderr.on('data', function (data) { buf += data.toString(); });
-        proc.on('close', function (code) {
-          if (code === 0) {
-            fill.style.width = '100%';
-            status.textContent = 'amverge installed successfully';
-            s._addTimer(function () {
-              s._showStep('complete');
-              if (cb) cb(true);
-            }, 300);
-          } else {
-            status.textContent = 'Install failed. Try: pip install amverge';
-            dbg('error', 'Setup', buf);
+      window.AmvergeRuntime.install({ extras: ['edge'], gpu: false }, {
+        onStage: function (message) {
+          status.textContent = message;
+        },
+        onLine: function (message) {
+          dbg('debug', 'Setup', message);
+        },
+        onDone: function (ok, detail) {
+          if (!ok) {
+            status.textContent = 'Install failed: ' + detail;
+            dbg('error', 'Setup', detail);
+            return;
           }
-        });
-        proc.on('error', function (err) {
-          status.textContent = 'Error: ' + err.message;
-        });
-      } catch (e) {
-        status.textContent = 'Error: ' + e.message;
-      }
+          s._resolvedPython = null;
+          fill.style.width = '100%';
+          status.textContent = 'amverge installed successfully';
+          s._addTimer(function () {
+            s._showStep('complete');
+            if (cb) cb(true);
+          }, 300);
+        }
+      });
     },
 
     skip: function () {
