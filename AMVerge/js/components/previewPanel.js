@@ -50,7 +50,7 @@
             clearTimeout(self._busyTimer);
             self._busyTimer = null;
           }
-          var fileUrl = 'file:///' + encodeURI(finalPath.replace(/\\/g, '/'));
+          var fileUrl = window.FileSystem.fileUrl(finalPath);
           dbg('info', 'Preview', 'Loading ' + fileUrl +
               (range ? ' @ ' + range.start + '-' + range.end : ''));
           window.VideoPlayer.setBusy(false);

@@ -21,6 +21,9 @@
   var TORCH_FAMILY = ['torch', 'torchvision'];
 
   var AmvergeRuntime = {
+    _activeProc: null,
+    _cancelled: false,
+
     /** the bundled uv, falling back to the app's staged copy and then PATH */
     uvPath: function () {
       var fs = window.FileSystem;
@@ -173,6 +176,7 @@
       var line = cb.onLine || function () {};
       var stage = cb.onStage || function () {};
       var done = cb.onDone || function () {};
+      this._cancelled = false;
 
       if (!fs || !fs.childProcess) {
         done(false, 'Node child_process is unavailable.');
@@ -198,6 +202,7 @@
         (wantNelux && existing !== PYTHON_VERSION_GPU_DECODE);
 
       var finish = function (code, last) {
+        if (s._cancelled) return;
         if (code !== 0) {
           done(false, last || 'uv exited with code ' + code);
           return;
@@ -279,6 +284,7 @@
     },
 
     _run: function (command, args, env, onLine, onClose) {
+      var s = this;
       var proc;
       var lastLine = '';
       try {
@@ -289,6 +295,8 @@
         onClose(-1, 'Could not start ' + command + ': ' + e.message);
         return;
       }
+
+      this._activeProc = proc;
 
       var onData = function (buf) {
         var lines = String(buf).split(/\r?\n/);
@@ -306,6 +314,7 @@
       proc.on('close', function (code) {
         if (settled) return;
         settled = true;
+        s._activeProc = null;
         onClose(code, lastLine);
       });
       // an 'error' event with no listener throws, and the caller would sit on a
@@ -313,8 +322,23 @@
       proc.on('error', function (err) {
         if (settled) return;
         settled = true;
+        s._activeProc = null;
         onClose(-1, command + ' failed to run: ' + err.message);
       });
+    },
+
+    cancel: function () {
+      this._cancelled = true;
+      var proc = this._activeProc;
+      this._activeProc = null;
+      if (!proc) return;
+      try {
+        if (process.platform === 'win32') {
+          window.FileSystem.childProcess.execSync('taskkill /F /T /PID ' + proc.pid, { windowsHide: true });
+        } else {
+          proc.kill('SIGTERM');
+        }
+      } catch (e) {}
     }
   };
 

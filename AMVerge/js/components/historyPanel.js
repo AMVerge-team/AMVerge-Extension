@@ -32,12 +32,24 @@
         var baseDir = window.FileSystem.getAppEpisodesStorageDir
           ? window.FileSystem.getAppEpisodesStorageDir()
           : null;
-        if (!baseDir) return;
+        if (!baseDir) {
+          this._manifestCache = {};
+          this._manifestCacheBaseDir = null;
+          this._appEpisodes = [];
+          var missingPage = document.getElementById('page-history');
+          if (missingPage && missingPage.classList.contains('active')) this.render();
+          return;
+        }
+        var rootChanged = this._manifestCacheBaseDir !== baseDir;
+        if (rootChanged) {
+          this._manifestCache = {};
+          this._manifestCacheBaseDir = baseDir;
+        }
 
         var dirs = window.FileSystem.fs.readdirSync(baseDir);
         var episodes = [];
         var nextCache = {};
-        var changed = dirs.length !== Object.keys(this._manifestCache).length;
+        var changed = rootChanged || dirs.length !== Object.keys(this._manifestCache).length;
 
         for (var i = 0; i < dirs.length; i++) {
           var dirName = dirs[i];
@@ -144,11 +156,27 @@
       try {
         var pointer = JSON.parse(raw);
         var prevKey = this._activeEpisodeKey;
+        var manifestMtime = 0;
+        var previewMtime = 0;
+        try {
+          if (pointer.manifest_path) {
+            manifestMtime = window.FileSystem.fs.statSync(pointer.manifest_path).mtimeMs;
+            var previewPath = window.FileSystem.path.join(
+              window.FileSystem.path.dirname(pointer.manifest_path),
+              'sync_preview.json'
+            );
+            if (window.FileSystem.fileExists(previewPath)) {
+              previewMtime = window.FileSystem.fs.statSync(previewPath).mtimeMs;
+            }
+          }
+        } catch (e) {}
         var nextKey = [
           pointer.episode_id || '',
           pointer.manifest_path || '',
           pointer.updated_at || 0,
-          pointer.scene_count || 0
+          pointer.scene_count || 0,
+          manifestMtime,
+          previewMtime
         ].join('|');
 
         this._activeEpisodePointer = pointer;
@@ -352,7 +380,7 @@
               var preview = previewSync[String(sceneIdx)];
               var webp = preview ? this._resolveEpisodeFile(preview.preview_webp_path || '', outputDir, []) : '';
               var poster = preview ? this._resolveEpisodeFile(preview.preview_poster_path || '', outputDir, []) : '';
-              if (webp || poster) thumb = webp || poster;
+              if (webp || poster) thumb = poster || webp;
 
               var startSec = s.start_sec !== undefined ? s.start_sec : (s.start || 0);
               var endSec = s.end_sec !== undefined ? s.end_sec : (s.end || startSec);

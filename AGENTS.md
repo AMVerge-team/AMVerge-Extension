@@ -154,7 +154,10 @@ stdout: JSON array of scene objects [{scene_index,start,end,duration,path,thumbn
 - Desktop discovery: `fileSystem.js` merges `paths.json` and `ai_storage_path.txt`, including `runtime_dir`, `ai_config_dir`, `hf_home_dir`, and `episodes_storage_dir`. `getAppProcessEnv()` must be passed to every CLI spawn so moved config and model caches remain visible.
 - Manual fallbacks: `settings.appRuntimePath` (folder containing `pyenv`) and `settings.appEpisodesPath` (storage root or `episodes_storage`).
 - WebP sync: the desktop writes `sync_preview.json` beside `manifest.json`, mapping scene indexes to generated WebP and JPG files. `historyPanel.js` merges those into `webp_files` source ranges without proxying the whole source; `video_files` scenes with no cut remain pending re-encodes.
-- Setup: `toolsSetup.js` resolves Python 3.11+ and uses `AmvergeRuntime.install()` / `uv`, never `python -m pip` inside the app-managed env. The `edge` extra does not install torch.
+- Setup: `toolsSetup.js` resolves Python 3.11+ and uses `AmvergeRuntime.install()` / `uv`, never `python -m pip` inside the app-managed env. The `edge` extra does not install torch. `AmvergeRuntime.cancel()` kills the active process tree and suppresses late completion.
+- CLI discovery: `App._resolveCliCandidates()` is passed to `AmvergeHandler.detect()`, which advances only on executable `ENOENT`, not detection failures.
+- Live sync: `_manifestCacheBaseDir` invalidates history after root changes. `_activeEpisodeKey` includes manifest and `sync_preview.json` mtimes.
+- URLs: all media uses `FileSystem.fileUrl()`, which escapes `#` and `?` after `encodeURI`.
 
 ## CEP Quirks
 

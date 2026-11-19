@@ -92,6 +92,12 @@
       }
     },
 
+    fileUrl: function (filePath) {
+      return 'file:///' + encodeURI(String(filePath || '').replace(/\\/g, '/'))
+        .replace(/#/g, '%23')
+        .replace(/\?/g, '%3F');
+    },
+
     getExtension: function (filePath) {
       if (!path) return '';
       var ext = path.extname(filePath);
@@ -282,6 +288,9 @@
         }
         if (!env.HF_HOME && !env.HF_HUB_CACHE && appPaths.hf_home_dir) {
           env.HF_HOME = appPaths.hf_home_dir;
+        }
+        if (!env.AMVERGE_SCENE_SCOUT_DIR && appPaths.scene_scout_dir) {
+          env.AMVERGE_SCENE_SCOUT_DIR = appPaths.scene_scout_dir;
         }
       }
       env.PYTHONUTF8 = '1';

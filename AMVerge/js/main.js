@@ -401,7 +401,7 @@
         // unset by default, which the handler reads as "use NVDEC if the shared
         // environment has it". set it to 'ffmpeg' to force the software path
         decodeMethod: this.settings.decodeMethod || '',
-        cli: this._resolveCli()
+        cli: this._resolveCliCandidates()
       }, {
         onProgress: function (pct, msg, stage) {
           window.ImportPanel.setProgress(pct, msg);
@@ -842,7 +842,7 @@
       img.style.filter = blur;
 
       var isVideo = /\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(mediaPath);
-      var fileUrl = 'file:///' + encodeURI(mediaPath.replace(/\\/g, '/'));
+      var fileUrl = window.FileSystem.fileUrl(mediaPath);
 
       if (!isVideo) {
         img.src = fileUrl;
@@ -913,7 +913,7 @@
             dispose();
             return;
           }
-          applySrc('file:///' + encodeURI(outFile.replace(/\\/g, '/')));
+          applySrc(window.FileSystem.fileUrl(outFile));
         });
       };
 

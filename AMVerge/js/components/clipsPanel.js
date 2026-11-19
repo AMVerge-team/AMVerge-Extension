@@ -151,7 +151,7 @@
         img.className = 'clip-thumb';
         img.draggable = false;
         if (thumb) {
-          img.src = 'file:///' + encodeURI(thumb.replace(/\\/g, '/'));
+          img.src = window.FileSystem.fileUrl(thumb);
           img.onerror = function () {
             this.style.display = 'none';
           };
@@ -159,6 +159,8 @@
           img.style.display = 'none';
         }
 
+        var previewWebp = s.preview_webp_path || '';
+        var restThumb = thumb;
         var clipPath = s.clip_path || s.path || '';
         var isPendingReencode = !clipPath && !s.source_range;
         if (isPendingReencode) {
@@ -238,7 +240,7 @@
               }
             };
 
-            var nextSrc = 'file:///' + encodeURI(playable.replace(/\\/g, '/'));
+            var nextSrc = window.FileSystem.fileUrl(playable);
             if (v.getAttribute('src') !== nextSrc) {
               v.src = nextSrc;
             } else {
@@ -254,6 +256,7 @@
           };
 
           w.addEventListener('mouseenter', function () {
+            if (previewWebp) img.src = window.FileSystem.fileUrl(previewWebp);
             if (!clipP || ClipsPanel._isScrolling || idx === ClipsPanel._focusedIdx) return;
             hovering = true;
             hoverTimer = setTimeout(function () {
@@ -265,6 +268,7 @@
           });
 
           w.addEventListener('mouseleave', function () {
+            if (restThumb) img.src = window.FileSystem.fileUrl(restThumb);
             cancelHover();
           });
 

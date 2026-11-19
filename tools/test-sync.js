@@ -1,4 +1,5 @@
 const assert = require('assert');
+const { EventEmitter } = require('events');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -120,7 +121,8 @@ function testFileSystemDiscovery() {
     runtime_dir: runtime,
     ai_config_dir: config,
     hf_home_dir: hf,
-    episodes_storage_dir: episodes
+    episodes_storage_dir: episodes,
+    scene_scout_dir: path.join(root, 'moved', 'amverge-scene-scout')
   });
   context.process.env.APPDATA = path.join(root, 'roaming');
   context.window.App = { settings: { appRuntimePath: '', appEpisodesPath: '' } };
@@ -131,6 +133,7 @@ function testFileSystemDiscovery() {
   const env = fileSystem.getAppProcessEnv();
   assert.strictEqual(env.AMVERGE_CONFIG_DIR, config);
   assert.strictEqual(env.HF_HOME, hf);
+  assert.strictEqual(env.AMVERGE_SCENE_SCOUT_DIR, path.join(root, 'moved', 'amverge-scene-scout'));
   assert.strictEqual(env.PYTHONUTF8, '1');
 
   const manual = path.join(root, 'manual-episodes');
@@ -147,6 +150,10 @@ function testFileSystemDiscovery() {
   assert.strictEqual(legacyPaths.ai_config_dir, path.join(legacyRoot, 'config'));
   assert.strictEqual(legacyPaths.hf_home_dir, path.join(legacyRoot, 'hf-cache'));
   assert.strictEqual(legacyPaths.runtime_dir, path.join(legacyRoot, 'runtime'));
+  assert.strictEqual(
+    fileSystem.fileUrl('D:\\AMVerge #1\\scene?cover.jpg'),
+    'file:///D:/AMVerge%20%231/scene%3Fcover.jpg'
+  );
 }
 
 function testWebpManifestSync() {
@@ -207,7 +214,8 @@ function testWebpManifestSync() {
   assert.strictEqual(loaded[0].source_range, true);
   assert.strictEqual(loaded[0].clip_path, null);
   assert.strictEqual(loaded[0].path, '');
-  assert.strictEqual(loaded[0].thumbnail, webp);
+  assert.strictEqual(loaded[0].thumbnail, poster);
+  assert.strictEqual(loaded[0].preview_webp_path, webp);
   assert.strictEqual(loaded[0].original_path, sourceVideo);
   assert.strictEqual(loaded[1].source_range, true);
 
@@ -390,15 +398,114 @@ function testSetupAndRuntime() {
   assert.strictEqual(installArgs.includes('torchvision'), false);
 }
 
+async function testCliCandidateFallback() {
+  const context = makeContext();
+  const commands = [];
+  context.window.FileSystem = {
+    fs: {},
+    path,
+    createFolder() {},
+    getAppProcessEnv: () => ({}),
+    childProcess: {
+      spawn(command) {
+        commands.push(command);
+        const proc = new EventEmitter();
+        proc.stdout = new EventEmitter();
+        proc.stderr = new EventEmitter();
+        if (command === 'amverge') {
+          setImmediate(() => proc.emit('error', { code: 'ENOENT', message: 'missing' }));
+        } else {
+          setImmediate(() => {
+            proc.stdout.emit('data', JSON.stringify({ scenes: [] }));
+            proc.emit('close', 0);
+          });
+        }
+        return proc;
+      }
+    }
+  };
+  load(context, 'AMVerge/js/utils/amvergeHandler.js');
+  let completed = false;
+  let failed = null;
+  context.window.AmvergeHandler.detect('video.mp4', tempDir('amverge-cli-'), {
+    method: 'keyframe',
+    cli: [
+      { command: 'amverge', prefix: [] },
+      { command: 'python', prefix: ['-m', 'amverge'] }
+    ]
+  }, {
+    onComplete: () => { completed = true; },
+    onError: (error) => { failed = error; }
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.strictEqual(failed, null);
+  assert.strictEqual(completed, true);
+  assert.deepStrictEqual(commands, ['amverge', 'python']);
+}
+
+function testRuntimeCancellation() {
+  const context = makeContext();
+  const runtimeDir = tempDir('amverge-cancel-');
+  const proc = new EventEmitter();
+  proc.pid = 4321;
+  proc.stdout = new EventEmitter();
+  proc.stderr = new EventEmitter();
+  let killed = '';
+  context.window.FileSystem = {
+    path,
+    getExtensionRoot: () => runtimeDir,
+    getRuntimeRoots: () => [runtimeDir],
+    getAppProcessEnv: () => ({}),
+    getHomeDir: () => runtimeDir,
+    fileExists: () => false,
+    createFolder() {},
+    childProcess: {
+      spawn: () => proc,
+      execSync: (command) => { killed = command; }
+    }
+  };
+  load(context, 'AMVerge/js/utils/amvergeRuntime.js');
+  const runtime = context.window.AmvergeRuntime;
+  runtime.pythonVersionOf = () => '3.12';
+  runtime.hasNelux = () => false;
+  runtime.isEditableCheckout = () => false;
+  let completed = false;
+  runtime.install({ extras: ['edge'], gpu: false }, {
+    onDone: () => { completed = true; }
+  });
+  runtime.cancel();
+  proc.emit('close', 1);
+  assert.ok(killed.includes('taskkill /F /T /PID 4321'));
+  assert.strictEqual(completed, false);
+}
+
+function testBatchInstallerGuards() {
+  const source = fs.readFileSync(path.join(ROOT, 'tools', 'build.js'), 'utf8');
+  assert.ok(source.includes('STAGE_DIR'));
+  assert.ok(source.includes('goto fail'));
+  assert.ok(source.includes('exit /b 1'));
+  assert.ok(source.includes(String.raw`C:\\Program Files\\Common Files\\Adobe`));
+  assert.strictEqual(source.includes(String.raw`C:\\Program Files (x86)\\Common Files\\Adobe`), false);
+}
+
 const tests = [
   testFileSystemDiscovery,
   testWebpManifestSync,
   testSourceRangeImportArguments,
   testExtendScriptTrimming,
-  testSetupAndRuntime
+  testSetupAndRuntime,
+  testCliCandidateFallback,
+  testRuntimeCancellation,
+  testBatchInstallerGuards
 ];
 
-for (const test of tests) {
-  test();
-  process.stdout.write(`PASS ${test.name}\n`);
-}
+(async () => {
+  for (const test of tests) {
+    await test();
+    process.stdout.write(`PASS ${test.name}\n`);
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
