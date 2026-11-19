@@ -91,6 +91,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "${{ github.ref_name }}"
-          $flags = @("--notes", "", "--title", "AMVerge Extension $env:VERSION")
+          $repo = "${{ github.repository }}"
+          $winSvg = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0wIDMuNDQ5TDkuNzUgMi4xdjkuNDUxSDBtMTAuOTQ5LTkuNjAyTDI0IDB2MTEuNEgxMC45NDlNMCAxMi42aDkuNzV2OS40NUwwIDIwLjY5OW0xMC45NDktOC4xaDEzLjA1MVYyNGwtMTMuMDUxLTEuODQiLz48L3N2Zz4="
+          @"
+          ## Downloads
+
+          | Platform / Format | Package | Compatibility | Download |
+          | :--- | :--- | :--- | :--- |
+          | ![Windows](https://img.shields.io/badge/Windows-Setup_Wizard-0078D6?style=flat&logo=$winSvg) | <kbd>AMVergeSetup.exe</kbd> | <kbd>After Effects CC 2018+</kbd> | [![Download Setup Wizard](https://img.shields.io/badge/Download_Setup_Wizard-0078D6?style=for-the-badge&logo=$winSvg)](https://github.com/$repo/releases/download/$tag/AMVergeSetup.exe) |
+          | ![ZXP](https://img.shields.io/badge/After_Effects-Signed_ZXP-9999FF?style=flat) | <kbd>AMVerge.zxp</kbd> | <kbd>ZXPInstaller / AE 2018+</kbd> | [![Download .zxp](https://img.shields.io/badge/Download_.zxp-7C3AED?style=for-the-badge)](https://github.com/$repo/releases/download/$tag/AMVerge.zxp) |
+          "@ | Set-Content -Path release_notes.md -Encoding utf8
+
+          $flags = @("--notes-file", "release_notes.md", "--title", "AMVerge Extension $env:VERSION")
           if ($tag.Contains("-")) { $flags += "--prerelease" } else { $flags += "--latest" }
           gh release create $tag (Get-ChildItem release).FullName @flags
