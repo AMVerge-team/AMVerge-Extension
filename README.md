@@ -58,3 +58,14 @@ cd .. && npm run build
 
 - `pip install amverge[edge]` for scene detection backend.
 - Python 3.9+ with PyAV and FFmpeg.
+
+---
+
+## Links
+
+- **Website**: [amverge.app](https://amverge.app/)
+- **Desktop App**: [AMVerge-team/AMVerge](https://github.com/AMVerge-team/AMVerge)
+- **CLI Backend**: [AMVerge-team/AMVerge-CLI](https://github.com/AMVerge-team/AMVerge-CLI)
+- **Website Repo**: [AMVerge-team/AMVerge-Website](https://github.com/AMVerge-team/AMVerge-Website)
+- **Homebrew Tap (macOS)**: [AMVerge-team/homebrew-tap](https://github.com/AMVerge-team/homebrew-tap)
+- **Discord**: [Join the AMVerge Discord](https://discord.gg/bmXjTgsAaN)
