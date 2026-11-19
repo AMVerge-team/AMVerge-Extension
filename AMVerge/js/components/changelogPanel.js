@@ -15,19 +15,18 @@
     {
       version: '1.2.1',
       date: '2026-11-19',
-      title: 'Moved storage and WebP sync fixes',
+      title: 'Your library, wherever you keep it',
       added: [
-        'Automatic discovery of moved desktop runtime, episodes, CLI config, and Hugging Face storage, plus manual runtime and episodes overrides in Settings.',
-        'Desktop WebP episodes now sync their generated WebP and JPG previews through per-episode sync metadata.'
+        'Follows your desktop app storage moves automatically: episodes, AI models, and previews keep working after you move them.',
+        'New storage overrides in Settings if you keep things somewhere unusual.',
+        'Desktop WebP episodes now sync with their animated previews.'
       ],
       fixed: [
-        'WebP-mode desktop episodes load as source ranges instead of empty pending re-encode tiles, and selected ranges import into AE trimmed and sequential.',
-        'The setup wizard requires Python 3.11+, works with app-managed uv environments without pip, and only downloads PyTorch for features that need it.',
-        'Detection, preview proxies, diagnostics, and runtime installs all inherit the moved CLI config and model cache.',
-        'Live sync reloads when manifests or previews change, history cache follows root changes, and paths containing # or ? load correctly.',
-        'Missing CLI executables fall through to the next candidate, and AI install Cancel now stops the real process tree.',
-        'The batch installer stages and verifies files, uses the same destination as the EXE updater, and returns failure instead of false success.',
-        'Auto-update stops active detection and preview jobs before replacing extension files.'
+        'WebP episodes open properly instead of showing empty pending tiles, and scenes import into After Effects trimmed and in order.',
+        'Setup is easier: finds the right Python, downloads less, and skips PyTorch unless a feature needs it.',
+        'Sync refreshes itself when episodes change, and folders with # or ? in the name load correctly.',
+        'Cancel now actually stops an AI install.',
+        'Updates are safer: the installer checks files before replacing anything and tells you if something fails.'
       ]
     },
     {
@@ -35,23 +34,23 @@
       date: '2026-11-18',
       title: 'Desktop app sync and one-click updates',
       added: [
-        'AE Local / AMVerge App switch at the top of the Scenes tab. AMVerge App shows whatever episode is open in the desktop app, and AE Local keeps your own detections untouched while you flip between them.',
-        'Live sync: open a different episode in the desktop app and the AMVerge App view follows it within a few seconds. Closing the episode in the desktop app clears it here too.',
-        'One-click updates on Windows: the update banner downloads the new installer, checks its SHA-256 against the GitHub release, and installs it after you approve the Windows prompt. Then just reload the panel.',
+        'Switch between your own AE detections and the episode open in the desktop app, right from the Scenes tab.',
+        'Live sync: the panel follows when you open or close an episode in the desktop app.',
+        'One-click updates on Windows: the banner downloads and installs the new version after you approve the Windows prompt.',
         'This Changelog tab.',
-        'About now shows the installed version and the latest desktop app release notes.'
+        'About shows your installed version and the desktop app release notes.'
       ],
       improved: [
-        'Keyframe detection cuts in two phases: lossless stream-copied clips show up in the grid first, and re-encodes fill in behind them.',
-        'Episodes on another drive (e.g. a D: HDD) are staged onto the fast temp drive before cutting.',
-        'Preview proxies reuse the ones the desktop app already built, so synced episodes start playing without a re-encode.',
-        'Desktop episodes moved to a custom storage folder still load: clips and thumbnails are found inside the episode folder even if the manifest still points at the old location.',
-        'ffmpeg and ffprobe bundled with the desktop app are put on PATH for detection, so clean machines without ffmpeg installed work.'
+        'Cutting is faster: finished clips appear first and the rest fill in behind them.',
+        'Episodes on slower drives are staged on a faster drive before cutting.',
+        'Synced episodes reuse the desktop app previews, so they play right away.',
+        'Episodes in custom storage folders load even if their manifest points at the old place.',
+        'Uses the desktop app ffmpeg, so a PC without ffmpeg installed works too.'
       ],
       fixed: [
-        'Preview no longer flickers for the first couple of seconds inside After Effects; frames are drawn to a canvas instead of a hardware video overlay.',
-        'Synced desktop episodes no longer try to build a preview from the entire source video, which left "Preparing preview..." spinning for minutes.',
-        'The setup check now asks for Python 3.11 or newer, and finds it through the py launcher.'
+        'Preview no longer flickers in the first seconds inside After Effects.',
+        'Synced episodes no longer get stuck on "Preparing preview...".',
+        'Setup finds Python 3.11+ through the py launcher.'
       ]
     },
     {
