@@ -349,7 +349,8 @@
       if (btn) {
         btn.disabled = !ready;
         // the full layer name is on hover, since the button only shows its number
-        btn.title = ready ? 'Detect scenes in ' + name : 'Select a video layer in After Effects';
+        var hostName = (window.csInterface && window.csInterface.getHostEnvironment && window.csInterface.getHostEnvironment().appId === 'PPRO') ? 'Premiere Pro' : 'After Effects';
+        btn.title = ready ? 'Detect scenes in ' + name : 'Select a video layer in ' + hostName;
       }
       if (label) label.textContent = ready ? 'Detect Selected Layer' + number : 'Select a layer to detect its scenes';
     },
@@ -359,7 +360,8 @@
       if (layer && layer.ok && layer.filePath && layer.layerIndex) {
         this.runDetection(layer.filePath);
       } else {
-        window.showToast('Select a video layer in After Effects first', 'warn');
+        var hostName = (window.csInterface && window.csInterface.getHostEnvironment && window.csInterface.getHostEnvironment().appId === 'PPRO') ? 'Premiere Pro' : 'After Effects';
+        window.showToast('Select a video layer in ' + hostName + ' first', 'warn');
       }
     },
 
