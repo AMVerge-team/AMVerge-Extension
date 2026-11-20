@@ -489,11 +489,44 @@ function testBatchInstallerGuards() {
   assert.strictEqual(source.includes(String.raw`C:\\Program Files (x86)\\Common Files\\Adobe`), false);
 }
 
+function testPremiereSelection() {
+  const context = makeContext();
+  const clipItem = {
+    name: 'Sukuna.mp4',
+    getMediaPath: () => 'D:\\Videos\\Sukuna.mp4'
+  };
+  const trackClip = {
+    name: 'Sukuna.mp4',
+    mediaType: 'Video',
+    duration: { seconds: 36.28 },
+    projectItem: clipItem
+  };
+  context.BridgeTalk = { appName: 'premierepro' };
+  context.ProjectItemType = { BIN: 2 };
+  context.app = {
+    project: {
+      rootItem: { children: { numItems: 0 } },
+      activeSequence: {
+        name: 'Edit_AMV',
+        getSelection: () => [trackClip]
+      }
+    }
+  };
+  load(context, 'AMVerge/jsx/host.jsx');
+  const raw = context.getSelectedLayerInfo();
+  const parsed = JSON.parse(raw);
+  assert.strictEqual(parsed.ok, true);
+  assert.strictEqual(parsed.filePath, 'D:\\Videos\\Sukuna.mp4');
+  assert.strictEqual(parsed.layerIndex, 1);
+  assert.strictEqual(parsed.layerName, 'Sukuna.mp4');
+}
+
 const tests = [
   testFileSystemDiscovery,
   testWebpManifestSync,
   testSourceRangeImportArguments,
   testExtendScriptTrimming,
+  testPremiereSelection,
   testSetupAndRuntime,
   testCliCandidateFallback,
   testRuntimeCancellation,

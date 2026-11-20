@@ -94,7 +94,8 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
 
 ::selection { background: rgba(var(--accent-rgb), 0.35); color: #fff; }
 
-.icon { width: 15px; height: 15px; flex-shrink: 0; display: block; }
+.icon { width: 15px; height: 15px; flex-shrink: 0; display: block; overflow: visible; }
+.icon use { pointer-events: none; }
 .sidebar-btn .icon { width: 17px; height: 17px; }
 .button .icon { width: 14px; height: 14px; }
 .settings-heading .icon { width: 17px; height: 17px; }
@@ -443,7 +444,10 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
   white-space: nowrap;
 }
 
-.button > .icon + *,
+.button > .icon:first-child:not(:only-child) {
+  margin-right: 6px;
+}
+
 .button > * + .icon {
   margin-left: 6px;
 }

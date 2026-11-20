@@ -385,18 +385,21 @@
       var btn = document.getElementById('detectActiveLayerBtn');
       var label = document.getElementById('detectLayerLabel');
       var layer = this._selectedLayerInfo;
+      var isPpro = this.isPremiereHost();
+      var itemWord = isPpro ? 'Clip' : 'Layer';
+      var itemWordLower = isPpro ? 'clip' : 'layer';
       // a timeline layer only: host.jsx also reports project-panel or viewer footage, which carries no layer index
       var ready = Boolean(layer && layer.ok && layer.filePath && layer.layerIndex);
       var name = ready ? (layer.layerName || layer.name || 'Footage') : '';
-      var number = ready ? ' #' + layer.layerIndex : '';
+      var number = ready ? (isPpro ? ': ' + name : ' #' + layer.layerIndex) : '';
 
       if (btn) {
         btn.disabled = !ready;
         // the full layer name is on hover, since the button only shows its number
-        var hostName = (window.csInterface && window.csInterface.getHostEnvironment && window.csInterface.getHostEnvironment().appId === 'PPRO') ? 'Premiere Pro' : 'After Effects';
-        btn.title = ready ? 'Detect scenes in ' + name : 'Select a video layer in ' + hostName;
+        var hostName = this.getHostDisplayName();
+        btn.title = ready ? 'Detect scenes in ' + name : 'Select a video ' + itemWordLower + ' in ' + hostName;
       }
-      if (label) label.textContent = ready ? 'Detect Selected Layer' + number : 'Select a layer to detect its scenes';
+      if (label) label.textContent = ready ? 'Detect Selected ' + itemWord + number : 'Select a ' + itemWordLower + ' to detect its scenes';
     },
 
     startImportFromActiveLayer: function () {
@@ -404,8 +407,9 @@
       if (layer && layer.ok && layer.filePath && layer.layerIndex) {
         this.runDetection(layer.filePath);
       } else {
-        var hostName = (window.csInterface && window.csInterface.getHostEnvironment && window.csInterface.getHostEnvironment().appId === 'PPRO') ? 'Premiere Pro' : 'After Effects';
-        window.showToast('Select a video layer in ' + hostName + ' first', 'warn');
+        var hostName = this.getHostDisplayName();
+        var itemWordLower = this.isPremiereHost() ? 'clip' : 'layer';
+        window.showToast('Select a video ' + itemWordLower + ' in ' + hostName + ' first', 'warn');
       }
     },
 

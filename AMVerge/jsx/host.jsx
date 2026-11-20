@@ -14,7 +14,14 @@ function amvergeJson(ok, message, filePath, name) {
 
 function isPremiere() {
   try {
-    return typeof app !== "undefined" && app.appName && String(app.appName).indexOf("Premiere") !== -1;
+    if (typeof BridgeTalk !== "undefined" && BridgeTalk.appName && String(BridgeTalk.appName).toLowerCase().indexOf("premiere") !== -1) {
+      return true;
+    }
+    if (typeof app !== "undefined") {
+      if (app.appName && String(app.appName).indexOf("Premiere") !== -1) return true;
+      if (app.project && typeof app.project.rootItem !== "undefined" && typeof CompItem === "undefined") return true;
+    }
+    return false;
   } catch (e) {
     return false;
   }
@@ -121,15 +128,44 @@ function pproGetSelectedLayerInfo() {
 
     var projectItem = null;
     var trackItem = null;
+    var layerIndex = 0;
     var seq = app.project.activeSequence;
 
     if (seq && seq.getSelection) {
       var selection = seq.getSelection();
       if (selection && selection.length > 0) {
         for (var i = 0; i < selection.length; i++) {
-          if (selection[i] && selection[i].projectItem) {
-            trackItem = selection[i];
-            projectItem = selection[i].projectItem;
+          var item = selection[i];
+          if (item && item.projectItem && item.mediaType !== "Audio") {
+            trackItem = item;
+            projectItem = item.projectItem;
+            layerIndex = i + 1;
+            break;
+          }
+        }
+        if (!projectItem) {
+          for (var k = 0; k < selection.length; k++) {
+            if (selection[k] && selection[k].projectItem) {
+              trackItem = selection[k];
+              projectItem = selection[k].projectItem;
+              layerIndex = k + 1;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (!projectItem && seq && seq.videoTracks) {
+      for (var t = 0; t < seq.videoTracks.numTracks && !projectItem; t++) {
+        var vTrack = seq.videoTracks[t];
+        if (!vTrack || !vTrack.clips) continue;
+        for (var c = 0; c < vTrack.clips.numItems; c++) {
+          var clip = vTrack.clips[c];
+          if (clip && clip.isSelected && clip.isSelected() && clip.projectItem) {
+            trackItem = clip;
+            projectItem = clip.projectItem;
+            layerIndex = c + 1;
             break;
           }
         }
@@ -142,6 +178,7 @@ function pproGetSelectedLayerInfo() {
         for (var j = 0; j < binSel.length; j++) {
           if (binSel[j] && binSel[j].type !== ProjectItemType.BIN && binSel[j].getMediaPath) {
             projectItem = binSel[j];
+            layerIndex = j + 1;
             break;
           }
         }
@@ -167,10 +204,11 @@ function pproGetSelectedLayerInfo() {
     json += ',"name":"' + jsonEscape(name) + '"';
     json += ',"filePath":"' + jsonEscape(filePath) + '"';
     json += ',"width":0,"height":0,"frameRate":0,"duration":' + dur.toFixed(2);
+    json += ',"layerIndex":' + (layerIndex || 1);
+    json += ',"layerName":"' + jsonEscape(String((trackItem && trackItem.name) || name)) + '"';
     if (seq) {
       json += ',"compName":"' + jsonEscape(String(seq.name || "")) + '"';
       if (trackItem) {
-        json += ',"layerName":"' + jsonEscape(String(trackItem.name || name)) + '"';
         json += ',"layerDuration":' + dur.toFixed(2);
       }
     }
