@@ -1,0 +1,7 @@
+{
+  "name": "amverge-resolve",
+  "version": "1.2.1",
+  "description": "AMVerge Workflow Integration Plugin for DaVinci Resolve Studio",
+  "main": "main.js",
+  "private": true
+}
