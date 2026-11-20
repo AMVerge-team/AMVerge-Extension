@@ -191,9 +191,11 @@
 #detectActiveLayerBtn {
   height: auto;
   min-height: 34px;
-  padding: 6px 16px;
+  max-width: 100%;
+  padding: 6px 14px;
   font-size: var(--text-base);
   line-height: 1.25;
+  overflow: hidden;
   box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.3);
 }
 
@@ -202,9 +204,13 @@
 }
 
 #detectLayerLabel {
+  flex: 0 1 auto;
   min-width: 0;
+  max-width: 100%;
   text-align: center;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* no layer selected yet: greyed, no glow */
