@@ -6,7 +6,6 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-sm);
 }
 
 /* the heading owns the bottom margin on its own, which would push the button
@@ -23,8 +22,11 @@
 .history-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
   margin-top: var(--space-md);
+}
+
+.history-item + .history-item {
+  margin-top: var(--space-xs);
 }
 
 .history-item {
@@ -37,7 +39,6 @@
   backdrop-filter: blur(8px);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  gap: 10px;
   transition: all var(--transition);
 }
 
@@ -47,7 +48,7 @@
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
 }
 
-.history-item-main { flex: 1; min-width: 0; }
+.history-item-main { flex: 1; min-width: 0; margin-right: 10px; }
 
 .history-item-name {
   font-family: Calibri, "Segoe UI", sans-serif;
@@ -62,17 +63,23 @@
 .history-item-meta {
   display: flex;
   align-items: center;
-  gap: 10px;
   /* Arial: scene counts and timestamps are read, not glanced at */
   font-family: var(--font-ui);
   font-size: var(--text-xs);
   color: var(--text-faint);
 }
 
+.history-item-meta > * + * {
+  margin-left: 10px;
+}
+
 .history-item-actions {
   display: flex;
-  gap: 6px;
   flex-shrink: 0;
+}
+
+.history-item-actions > * + * {
+  margin-left: 6px;
 }
 
 .history-item-actions .button {
@@ -106,7 +113,7 @@
   color: var(--accent);
   opacity: 0.7;
   margin-bottom: var(--space-sm);
-  filter: drop-shadow(0 0 12px rgb(var(--accent-rgb) / 0.4));
+  filter: drop-shadow(0 0 12px rgba(var(--accent-rgb), 0.4));
 }
 
 .history-empty-title {

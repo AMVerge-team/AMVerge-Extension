@@ -94,7 +94,7 @@
       
       <div class="settings-row settings-row-inline">
         <span class="settings-label">Background Media</span>
-        <div class="settings-control" style="display:flex;gap:6px">
+        <div class="settings-control" style="display:flex">
           <button class="button button-small" onclick="App.pickBackgroundMedia()">
             <svg class="icon"><use href="#icon-folder"/></svg> <span id="bgMediaBtnLabel">Upload</span>
           </button>
@@ -106,7 +106,7 @@
 
       <div class="settings-row settings-row-inline" id="bgOpacityRow">
         <span class="settings-label">Background Opacity</span>
-        <div class="settings-control" style="display:flex;align-items:center;gap:8px">
+        <div class="settings-control" style="display:flex;align-items:center">
           <input type="range" class="settings-range" id="settingsBgOpacity" min="0" max="1" step="0.05" value="1" oninput="App.onBgOpacityChange(this.value)">
           <span class="settings-value" id="bgOpacityValue" style="width:36px;text-align:right">100%</span>
         </div>
@@ -114,7 +114,7 @@
 
       <div class="settings-row settings-row-inline" id="bgBlurRow">
         <span class="settings-label">Background Blur</span>
-        <div class="settings-control" style="display:flex;align-items:center;gap:8px">
+        <div class="settings-control" style="display:flex;align-items:center">
           <input type="range" class="settings-range" id="settingsBgBlur" min="0" max="60" step="2" value="0" oninput="App.onBgBlurChange(this.value)">
           <span class="settings-value" id="bgBlurValue" style="width:36px;text-align:right">0px</span>
         </div>
@@ -122,7 +122,7 @@
 
       <div class="settings-row settings-row-inline">
         <span class="settings-label">Grid Preview Speed</span>
-        <div class="settings-control" style="display:flex;align-items:center;gap:8px">
+        <div class="settings-control" style="display:flex;align-items:center">
           <input type="range" class="settings-range" id="settingsPreviewSpeed" min="0.5" max="2.5" step="0.1" value="1" oninput="App.onPreviewSpeedChange(this.value)">
           <span class="settings-value" id="previewSpeedValue" style="width:36px;text-align:right">1.0x</span>
         </div>
@@ -167,8 +167,8 @@
         </div>
       </div>
       <p class="sys-interpreter" id="sysInterpreter"></p>
-      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
-        <button class="button" onclick="App.runDoctor()"><svg class="icon"><use href="#icon-tools"/></svg> Run Diagnostics</button>
+      <div style="margin-top:8px;display:flex;flex-wrap:wrap">
+        <button class="button" style="margin-right:6px" onclick="App.runDoctor()"><svg class="icon"><use href="#icon-tools"/></svg> Run Diagnostics</button>
         <button class="button button-danger" onclick="App.confirmFactoryReset()"><svg class="icon"><use href="#icon-trash"/></svg> Reset to Setup</button>
       </div>
     </div>

@@ -8,20 +8,22 @@
 .console-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
   padding: 8px var(--space-md);
   background: rgba(14, 14, 14, 0.85);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgb(var(--accent-rgb) / 0.18);
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.18);
   flex: 0 0 auto;
   flex-wrap: wrap;
+}
+
+.console-toolbar > * + * {
+  margin-left: var(--space-sm);
 }
 
 .console-header-left {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
 }
 
 .console-filters {
@@ -55,7 +57,7 @@
 .console-filter-btn.active {
   background: var(--selector-active-bg);
   color: var(--accent);
-  box-shadow: 0 0 6px rgb(var(--accent-rgb) / 0.3);
+  box-shadow: 0 0 6px rgba(var(--accent-rgb), 0.3);
 }
 
 .console-search-wrap {
@@ -93,7 +95,7 @@
 
 .console-search-wrap input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 10px rgb(var(--accent-rgb) / 0.25);
+  box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.25);
 }
 
 .console-search-wrap input::placeholder {
@@ -102,8 +104,11 @@
 
 .console-actions {
   display: flex;
-  gap: var(--space-xs);
   align-items: center;
+}
+
+.console-actions > * + * {
+  margin-left: var(--space-xs);
 }
 
 .console-entries {
@@ -121,10 +126,13 @@
 .console-entry {
   display: flex;
   align-items: flex-start;
-  gap: 5px;
   padding: 4px 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
   transition: background var(--transition);
+}
+
+.console-entry > * + * {
+  margin-left: 5px;
 }
 
 .console-entry:hover {
@@ -141,8 +149,8 @@
 .console-entry-source {
   flex-shrink: 0;
   color: var(--accent);
-  background: rgb(var(--accent-rgb) / 0.1);
-  border: 1px solid rgb(var(--accent-rgb) / 0.2);
+  background: rgba(var(--accent-rgb), 0.1);
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
   border-radius: var(--radius-sm);
   padding: 0 5px;
   font-size: 10px;
@@ -189,14 +197,17 @@
 }
 .console-entry.console-success {
   border-left: 3px solid var(--accent);
-  background: rgb(var(--accent-rgb) / 0.05);
+  background: rgba(var(--accent-rgb), 0.05);
 }
 
 /* fills the list and centres, rather than sitting under the list's own top
    padding, which put it off centre */
 .console-empty {
   position: absolute;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   padding: 16px;
   box-sizing: border-box;
   text-align: center;
@@ -207,7 +218,6 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-xs);
 }
 
 .console-empty .icon {

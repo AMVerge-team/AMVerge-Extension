@@ -31,9 +31,9 @@
       <div id="setupCheck" class="setup-step" style="display:none">
         <h2>Checking System...</h2>
         <div id="setupCheckResults"></div>
-        <div style="margin-top:8px;display:flex;gap:4px">
-          <button class="button" onclick="App._setupSkip()">Skip</button>
-          <button class="button button-accent" id="setupInstallBtn" onclick="App._setupInstall()" disabled>Install</button>
+        <div style="margin-top:8px;display:flex">
+          <button class="button" style="margin-right:4px" onclick="App._setupSkip()">Skip</button>
+          <button class="button button-accent" style="margin-right:4px" id="setupInstallBtn" onclick="App._setupInstall()" disabled>Install</button>
           <button class="button button-accent" id="setupContinueBtn" onclick="App._setupFinish()" disabled>Continue</button>
         </div>
       </div>

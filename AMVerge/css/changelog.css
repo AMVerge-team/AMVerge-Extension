@@ -6,7 +6,6 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-sm);
 }
 
 .changelog-header .settings-heading { margin-bottom: 0; }
@@ -21,9 +20,12 @@
 .changelog-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
   margin-top: var(--space-md);
   padding-bottom: var(--space-lg);
+}
+
+.changelog-entry + .changelog-entry {
+  margin-top: var(--space-sm);
 }
 
 .changelog-entry {
@@ -37,19 +39,22 @@
 }
 
 .changelog-entry.is-current {
-  border-left-color: rgb(var(--accent-rgb) / 0.7);
-  box-shadow: 0 0 0 1px rgb(var(--accent-rgb) / 0.12), 0 6px 18px rgba(0, 0, 0, 0.3);
+  border-left-color: rgba(var(--accent-rgb), 0.7);
+  box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.12), 0 6px 18px rgba(0, 0, 0, 0.3);
 }
 
 .changelog-entry.is-unreleased {
   border-left-style: dashed;
-  border-left-color: rgb(var(--accent-rgb) / 0.45);
+  border-left-color: rgba(var(--accent-rgb), 0.45);
 }
 
 .changelog-entry-head {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+}
+
+.changelog-entry-head > * + * {
+  margin-left: var(--space-sm);
 }
 
 .changelog-version {
@@ -78,8 +83,8 @@
 
 .changelog-tag-current {
   color: #fff;
-  background: rgb(var(--accent-rgb) / 0.22);
-  border-color: rgb(var(--accent-rgb) / 0.5);
+  background: rgba(var(--accent-rgb), 0.22);
+  border-color: rgba(var(--accent-rgb), 0.5);
 }
 
 .changelog-date {
@@ -109,7 +114,7 @@
   color: var(--text-faint);
 }
 
-.changelog-section-added .changelog-section-label { color: rgb(var(--accent-rgb) / 0.95); }
+.changelog-section-added .changelog-section-label { color: rgba(var(--accent-rgb), 0.95); }
 
 .changelog-items {
   margin: 0;

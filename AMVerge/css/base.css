@@ -7,17 +7,17 @@
 
 :root {
   --accent: #22c55e;
-  --accent-rgb: 34 197 94;
+  --accent-rgb: 34, 197, 94;
   --bg: #000000;
   --bg-accent: #001a00;
   --bg-gradient: linear-gradient(160deg, #000000 50%, var(--bg-accent) 100%);
   --surface: rgba(20, 20, 20, 0.65);
   --surface-elevated: rgba(26, 26, 26, 0.85);
   --surface-hover: rgba(40, 40, 40, 0.75);
-  --surface-active: rgb(var(--accent-rgb) / 0.16);
-  --selector-active-bg: rgb(var(--accent-rgb) / 0.18);
+  --surface-active: rgba(var(--accent-rgb), 0.16);
+  --selector-active-bg: rgba(var(--accent-rgb), 0.18);
   --selector-active-fg: var(--accent);
-  --selector-active-border: rgb(var(--accent-rgb) / 0.5);
+  --selector-active-border: rgba(var(--accent-rgb), 0.5);
   --inset: rgba(0, 0, 0, 0.5);
   --border: rgba(255, 255, 255, 0.12);
   --border-strong: rgba(255, 255, 255, 0.22);
@@ -89,10 +89,10 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(var(--accent-rgb) / 0.5);
+  background: rgba(var(--accent-rgb), 0.5);
 }
 
-::selection { background: rgb(var(--accent-rgb) / 0.35); color: #fff; }
+::selection { background: rgba(var(--accent-rgb), 0.35); color: #fff; }
 
 .icon { width: 15px; height: 15px; flex-shrink: 0; display: block; }
 .sidebar-btn .icon { width: 17px; height: 17px; }
@@ -117,7 +117,10 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
 
 .app-bg-container {
   position: absolute;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -127,7 +130,10 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
 
 .app-bg-media {
   position: absolute;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -136,7 +142,10 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
 
 .app-bg-overlay {
   position: absolute;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
   background: var(--bg-gradient);
   opacity: 0.55;
   pointer-events: none;
@@ -165,7 +174,7 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
   border-radius: 50%;
   background: var(--accent);
   cursor: pointer;
-  box-shadow: 0 0 8px rgb(var(--accent-rgb) / 0.5);
+  box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.5);
   transition: all var(--transition);
 }
 
@@ -221,8 +230,11 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-xs);
   padding: var(--space-sm) 0;
+}
+
+.sidebar-nav > .sidebar-btn + .sidebar-btn {
+  margin-top: var(--space-xs);
 }
 
 .sidebar-bottom {
@@ -259,7 +271,7 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
   color: var(--accent);
   background: var(--selector-active-bg);
   border-color: var(--selector-active-border);
-  box-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.25);
+  box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.25);
 }
 
 .sidebar-btn.active::before {
@@ -298,7 +310,7 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
   white-space: nowrap;
   pointer-events: none;
   z-index: 1000;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), 0 0 8px rgb(var(--accent-rgb) / 0.2);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6), 0 0 8px rgba(var(--accent-rgb), 0.2);
   animation: tooltipFade 0.15s ease-out;
 }
 
@@ -324,14 +336,14 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
 .update-banner {
   flex-shrink: 0;
   align-items: center;
-  gap: 8px;
   padding: 6px 8px 6px 10px;
-  border-bottom: 1px solid rgb(var(--accent-rgb) / 0.4);
-  background: rgb(var(--accent-rgb) / 0.12);
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.4);
+  background: rgba(var(--accent-rgb), 0.12);
   font-family: var(--font-ui);
   font-size: 11px;
   color: var(--text-dim);
 }
+.update-banner > * + * { margin-left: 8px; }
 .update-banner > .icon { width: 14px; height: 14px; color: var(--accent); flex-shrink: 0; }
 .update-banner-text { flex: 1; min-width: 0; }
 .update-banner-get { padding: 3px 10px; font-size: 11px; }
@@ -363,15 +375,15 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
 
 
 @keyframes logoPulse {
-  0% { transform: scale(1); filter: var(--logo-filter, hue-rotate(0deg)) drop-shadow(0 0 12px rgb(var(--accent-rgb) / 0.25)); }
-  100% { transform: scale(1.03); filter: var(--logo-filter, hue-rotate(0deg)) drop-shadow(0 0 22px rgb(var(--accent-rgb) / 0.55)); }
+  0% { transform: scale(1); filter: var(--logo-filter, hue-rotate(0deg)) drop-shadow(0 0 12px rgba(var(--accent-rgb), 0.25)); }
+  100% { transform: scale(1.03); filter: var(--logo-filter, hue-rotate(0deg)) drop-shadow(0 0 22px rgba(var(--accent-rgb), 0.55)); }
 }
 
 .about-logo-wrap { text-align: center; margin-bottom: var(--space-sm); }
 .about-logo {
   width: 44px;
   height: 44px;
-  filter: var(--logo-filter, hue-rotate(0deg)) drop-shadow(0 0 10px rgb(var(--accent-rgb) / 0.45));
+  filter: var(--logo-filter, hue-rotate(0deg)) drop-shadow(0 0 10px rgba(var(--accent-rgb), 0.45));
   transition: filter var(--transition);
 }
 
@@ -426,10 +438,14 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
   transition: border-color var(--transition), background var(--transition), color var(--transition), box-shadow var(--transition);
   line-height: 1;
   white-space: nowrap;
+}
+
+.button > .icon + *,
+.button > * + .icon {
+  margin-left: 6px;
 }
 
 .button:hover:not(:disabled) {
@@ -450,8 +466,8 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
 }
 
 .button-accent {
-  border-color: rgb(var(--accent-rgb) / 0.7);
-  background: rgb(var(--accent-rgb) / 0.12);
+  border-color: rgba(var(--accent-rgb), 0.7);
+  background: rgba(var(--accent-rgb), 0.12);
   color: var(--accent);
 }
 
@@ -461,7 +477,7 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
   border-color: var(--accent);
   background: var(--selector-active-bg);
   color: #ffffff;
-  box-shadow: 0 0 16px rgb(var(--accent-rgb) / 0.35);
+  box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.35);
 }
 
 .button-accent-hover:hover:not(:disabled) .icon {
@@ -472,7 +488,7 @@ input, select, textarea, button { font-family: var(--font-ui); letter-spacing: 0
   border-color: var(--accent);
   background: var(--selector-active-bg);
   color: #ffffff;
-  box-shadow: 0 0 16px rgb(var(--accent-rgb) / 0.35);
+  box-shadow: 0 0 16px rgba(var(--accent-rgb), 0.35);
 }
 
 .button-large {
@@ -535,7 +551,7 @@ button,
 /* the "AMV" half carries the accent, the rest stays foreground */
 .amverge-wordmark .wm-accent {
   color: var(--accent);
-  text-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.45);
+  text-shadow: 0 0 12px rgba(var(--accent-rgb), 0.45);
 }
 
 /* full lockup, used on the setup gate and the idle home screen */

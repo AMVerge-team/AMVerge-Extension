@@ -33,6 +33,7 @@
       dbg('info', 'App', 'Initializing AMVerge...');
 
       this.loadSettings();
+      this.applyHostBranding();
       this.initModules();
       window.SettingsPanel.populate(this.settings);
       this.bindEvents();
@@ -70,6 +71,49 @@
       window.UpdateCheck.run();
 
       dbg('info', 'App', 'AMVerge ready');
+    },
+
+    isPremiereHost: function () {
+      try {
+        if (window.csInterface && window.csInterface.getHostEnvironment) {
+          var env = window.csInterface.getHostEnvironment();
+          if (env && env.appId === 'PPRO') return true;
+        }
+        if (window.__adobe_cep__ && window.__adobe_cep__.getHostEnvironment) {
+          var raw = JSON.parse(window.__adobe_cep__.getHostEnvironment() || '{}');
+          if (raw && raw.appId === 'PPRO') return true;
+        }
+      } catch (e) {}
+      return false;
+    },
+
+    getHostDisplayName: function () {
+      return this.isPremiereHost() ? 'Premiere Pro' : 'After Effects';
+    },
+
+    getHostShortName: function () {
+      return this.isPremiereHost() ? 'Pr' : 'AE';
+    },
+
+    applyHostBranding: function () {
+      if (!this.isPremiereHost()) return;
+      var setupRoot = document.getElementById('setup-gate');
+      if (setupRoot) {
+        var nodes = setupRoot.querySelectorAll('p');
+        for (var i = 0; i < nodes.length; i++) {
+          nodes[i].textContent = nodes[i].textContent.replace(/After Effects/g, 'Premiere Pro');
+        }
+      }
+      var pillLocal = document.getElementById('sourcePillLocal');
+      if (pillLocal) {
+        pillLocal.title = 'Detect scenes directly in Premiere Pro';
+        var span = pillLocal.querySelector('span');
+        if (span) span.textContent = 'Pr Local';
+      }
+      var importBtn = document.getElementById('importToAeBtn');
+      if (importBtn) {
+        importBtn.innerHTML = '<svg class="icon"><use href="#icon-import"/></svg> Import Selected to Pr';
+      }
     },
 
     initModules: function () {
@@ -700,7 +744,7 @@
 
       function importNext(i) {
         if (i >= selected.length) {
-          window.showToast('Imported ' + total + ' scene' + (total !== 1 ? 's' : '') + ' to AE', 'success');
+          window.showToast('Imported ' + total + ' scene' + (total !== 1 ? 's' : '') + ' to ' + s.getHostShortName(), 'success');
           s.switchTab('home');
           return;
         }
@@ -803,7 +847,7 @@
       if (gradient) this.settings.backgroundGradient = gradient;
       document.documentElement.style.setProperty('--accent', color);
       var rgb = this._hexToRgb(color);
-      document.documentElement.style.setProperty('--accent-rgb', rgb.r + ' ' + rgb.g + ' ' + rgb.b);
+      document.documentElement.style.setProperty('--accent-rgb', rgb.r + ', ' + rgb.g + ', ' + rgb.b);
       if (this.settings.backgroundGradient) {
         document.documentElement.style.setProperty('--bg-accent', this.settings.backgroundGradient);
       }

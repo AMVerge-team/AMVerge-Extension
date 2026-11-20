@@ -88,10 +88,11 @@
 
     updateImportBtn: function (count) {
       this.importBtn.disabled = count === 0;
+      var hostShort = (this.app && this.app.getHostShortName) ? this.app.getHostShortName() : 'AE';
       if (count > 0) {
-        this.importBtn.innerHTML = '<svg class="icon"><use href="#icon-import"/></svg> Import ' + count + ' Scene' + (count !== 1 ? 's' : '') + ' to AE';
+        this.importBtn.innerHTML = '<svg class="icon"><use href="#icon-import"/></svg> Import ' + count + ' Scene' + (count !== 1 ? 's' : '') + ' to ' + hostShort;
       } else {
-        this.importBtn.innerHTML = '<svg class="icon"><use href="#icon-import"/></svg> Import Selected to AE';
+        this.importBtn.innerHTML = '<svg class="icon"><use href="#icon-import"/></svg> Import Selected to ' + hostShort;
       }
     }
   };

@@ -116,8 +116,8 @@
       <p class="modal-desc">
         This will clear all extension preferences and rerun the First-Run Setup Wizard.
       </p>
-      <div style="display:flex;gap:8px;justify-content:center">
-        <button class="button" onclick="App.closeResetConfirmModal()">Cancel</button>
+      <div style="display:flex;justify-content:center">
+        <button class="button" style="margin-right:8px" onclick="App.closeResetConfirmModal()">Cancel</button>
         <button class="button button-danger" onclick="App.executeFactoryReset()">Confirm Reset</button>
       </div>
     </div>
@@ -130,8 +130,8 @@
       <p class="modal-desc">
         This will remove the episode from history and delete its cached clips from disk.
       </p>
-      <div style="display:flex;gap:8px;justify-content:center">
-        <button class="button" onclick="HistoryPanel.closeDeleteModal()">Cancel</button>
+      <div style="display:flex;justify-content:center">
+        <button class="button" style="margin-right:8px" onclick="HistoryPanel.closeDeleteModal()">Cancel</button>
         <button class="button button-danger" onclick="HistoryPanel.confirmDeleteRun()">Confirm Delete</button>
       </div>
     </div>
@@ -159,8 +159,8 @@
       <svg class="icon" style="width:36px;height:36px;color:#ef4444;margin:0 auto 10px;display:block"><use href="#icon-trash"/></svg>
       <h2 class="modal-title" style="color:#ef4444">Clear All History?</h2>
       <p id="clearHistoryDesc" class="modal-desc"></p>
-      <div style="display:flex;gap:8px;justify-content:center">
-        <button class="button" onclick="HistoryPanel.closeClearAllModal()">Cancel</button>
+      <div style="display:flex;justify-content:center">
+        <button class="button" style="margin-right:8px" onclick="HistoryPanel.closeClearAllModal()">Cancel</button>
         <button class="button button-danger" onclick="HistoryPanel.confirmClearAll()">Confirm Clear</button>
       </div>
     </div>
