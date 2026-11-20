@@ -33,7 +33,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Files]
 ; Copy files from the structured "Extension Folder" directory
-Source: "{#SourcePath}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
+Source: "{#SourcePath}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+Source: "{#SourcePath}\*"; DestDir: "{commoncf64}\Adobe\CEP\extensions\AMVerge"; Flags: recursesubdirs createallsubdirs ignoreversion; Check: IsWin64
 
 [Registry]
 ; Enable player debug mode across CSXS versions (AE CC 2018+) so unsigned files load correctly
