@@ -5,8 +5,8 @@
     </ExtensionList>
     <ExecutionEnvironment>
         <HostList>
-            <Host Name="AEFT" Version="[15.0,99.9]"/>
-            <Host Name="PPRO" Version="[15.0,99.9]"/>
+            <Host Name="AEFT" Version="[0.0,99.9]"/>
+            <Host Name="PPRO" Version="[0.0,99.9]"/>
         </HostList>
         <LocaleList>
             <Locale Code="All"/>

@@ -6,9 +6,9 @@ const zxpSignCmd = require('zxp-sign-cmd');
 
 const UNIVERSAL_PROFILE = {
     label: 'AE2018+',
-    hostVersion: '[15.0,99.9]',
+    hostVersion: '[0.0,99.9]',
     csxsVersion: '6.0',
-    description: 'After Effects CC 2018+ (v15.0+)'
+    description: 'After Effects & Premiere Pro CC 2018+'
 };
 
 const SRC_DIR = path.join(__dirname, '..', 'AMVerge');
@@ -135,8 +135,8 @@ async function runBuild() {
         );
 
         manifestContent = manifestContent.replace(
-            /<Host Name="AEFT" Version="[^"]*"/g,
-            '<Host Name="AEFT" Version="' + UNIVERSAL_PROFILE.hostVersion + '"'
+            /<Host Name="(AEFT|PPRO)" Version="[^"]*"/g,
+            '<Host Name="$1" Version="' + UNIVERSAL_PROFILE.hostVersion + '"'
         );
 
         manifestContent = manifestContent.replace(
