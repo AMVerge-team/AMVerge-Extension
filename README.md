@@ -1,7 +1,6 @@
-<h1 align="center">
-  <img src="AMVerge/AMVerge-Logo.png" height="48" alt="AMVerge"/>
-  <br />
- </h1>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/AMVerge-team/.github/main/assets/banners/AMVerge-Extension.gif" alt="AMVerge Extension" width="1440"/>
+</p>
 <p align="center">
   <b>Scene Detection & Clip Import directly in After Effects.</b><br>
   <i>Detect scene changes, preview clips, and import them as layers.</i>
