@@ -419,7 +419,7 @@
 
       var ffmpegDir = fs.getPortableFfmpegDir();
       var zipPath = fs.path.join(ffmpegDir, 'ffmpeg-temp.zip');
-      var url = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-gpl-8.1.zip';
+      var url = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip';
 
       fs.createFolder(ffmpegDir);
 

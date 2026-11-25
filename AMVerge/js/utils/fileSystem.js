@@ -412,18 +412,18 @@
     getAmvergeConfigDir: function () {
       var path = this.path;
       var home = this.getHomeDir();
-      var appPaths = this.readAppPaths();
       
-      // Check AMVERGE_CONFIG_DIR env var first
+      // Check AMVERGE_CONFIG_DIR env var first (highest priority)
       var override = (process.env.AMVERGE_CONFIG_DIR || '').trim();
       if (override) return override;
       
-      // Check if app paths has ai_config_dir
+      // Check if app paths has ai_config_dir (from paths.json or ai_storage_path.txt)
+      var appPaths = this.readAppPaths();
       if (appPaths && appPaths.ai_config_dir) {
         return appPaths.ai_config_dir;
       }
       
-      // Default locations
+      // Default locations (matches Python's config.py fallback)
       var roaming = process.env.APPDATA || path.join(home, 'AppData', 'Roaming');
       if (process.platform === 'win32') {
         return path.join(roaming, 'com.amverge.cli');
