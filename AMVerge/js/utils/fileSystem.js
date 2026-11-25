@@ -408,6 +408,89 @@
       return null;
     },
 
+    /** Directory where amverge stores portable FFmpeg (matches Python config.py) */
+    getAmvergeConfigDir: function () {
+      var path = this.path;
+      var home = this.getHomeDir();
+      var appPaths = this.readAppPaths();
+      
+      // Check AMVERGE_CONFIG_DIR env var first
+      var override = (process.env.AMVERGE_CONFIG_DIR || '').trim();
+      if (override) return override;
+      
+      // Check if app paths has ai_config_dir
+      if (appPaths && appPaths.ai_config_dir) {
+        return appPaths.ai_config_dir;
+      }
+      
+      // Default locations
+      var roaming = process.env.APPDATA || path.join(home, 'AppData', 'Roaming');
+      if (process.platform === 'win32') {
+        return path.join(roaming, 'com.amverge.cli');
+      } else if (process.platform === 'darwin') {
+        return path.join(home, 'Library', 'Application Support', 'com.amverge.cli');
+      }
+      return path.join(home, '.config', 'com.amverge.cli');
+    },
+
+    /** Directory where portable FFmpeg is stored */
+    getPortableFfmpegDir: function () {
+      return this.path.join(this.getAmvergeConfigDir(), 'ffmpeg');
+    },
+
+    /** Find portable FFmpeg executable, or null if not installed */
+    getPortableFfmpeg: function () {
+      var path = this.path;
+      var ffmpegDir = this.getPortableFfmpegDir();
+      var names = process.platform === 'win32' ? ['ffmpeg.exe', 'ffmpeg'] : ['ffmpeg'];
+      
+      for (var i = 0; i < names.length; i++) {
+        // Check bin/ subdirectory first (extracted zip structure)
+        var binCandidate = path.join(ffmpegDir, 'bin', names[i]);
+        if (this.fileExists(binCandidate)) return binCandidate;
+        
+        // Check root of ffmpeg dir
+        var rootCandidate = path.join(ffmpegDir, names[i]);
+        if (this.fileExists(rootCandidate)) return rootCandidate;
+      }
+      return null;
+    },
+
+    /** Find portable FFprobe executable, or null if not installed */
+    getPortableFfprobe: function () {
+      var path = this.path;
+      var ffmpegDir = this.getPortableFfmpegDir();
+      var names = process.platform === 'win32' ? ['ffprobe.exe', 'ffprobe'] : ['ffprobe'];
+      
+      for (var i = 0; i < names.length; i++) {
+        var binCandidate = path.join(ffmpegDir, 'bin', names[i]);
+        if (this.fileExists(binCandidate)) return binCandidate;
+        
+        var rootCandidate = path.join(ffmpegDir, names[i]);
+        if (this.fileExists(rootCandidate)) return rootCandidate;
+      }
+      return null;
+    },
+
+    /** Check if FFmpeg is available (PATH or portable) */
+    isFfmpegAvailable: function () {
+      // Check portable first
+      if (this.getPortableFfmpeg()) return true;
+      
+      // Check PATH
+      if (!this.childProcess) return false;
+      try {
+        this.childProcess.execFileSync('ffmpeg', ['-version'], {
+          encoding: 'utf8',
+          timeout: 5000,
+          windowsHide: true
+        });
+        return true;
+      } catch (e) {
+        return false;
+      }
+    },
+
     readAppTheme: function () {
       if (!fs || !path || !os) return null;
       try {

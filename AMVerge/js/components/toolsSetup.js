@@ -189,12 +189,24 @@
 
     _checkFfmpeg: function () {
       var s = this;
+      var fs = window.FileSystem;
+      
+      // Check portable FFmpeg first (installed by AMVerge)
+      var portableFfmpeg = fs.getPortableFfmpeg ? fs.getPortableFfmpeg() : null;
+      if (portableFfmpeg) {
+        s._markCheck('ffmpeg', 'pass', 'Portable: ' + fs.path.basename(fs.path.dirname(portableFfmpeg)));
+        this._addTimer(function () { s._checkGpu(); }, 100);
+        return;
+      }
+      
+      // Check PATH
       try {
-        var result = window.FileSystem.childProcess.execFileSync('ffmpeg', ['-version'], { encoding: 'utf8', timeout: 5000, windowsHide: true });
-        s._markCheck('ffmpeg', 'pass', 'Found');
+        var result = fs.childProcess.execFileSync('ffmpeg', ['-version'], { encoding: 'utf8', timeout: 5000, windowsHide: true });
+        s._markCheck('ffmpeg', 'pass', 'Found in PATH');
         this._addTimer(function () { s._checkGpu(); }, 100);
       } catch (e) {
-        s._markCheck('ffmpeg', 'warn', 'Not in PATH (may still work)');
+        // FFmpeg not found anywhere - this is a blocking issue
+        s._markCheck('ffmpeg', 'fail', 'Not found (required for video processing)');
         this._addTimer(function () { s._checkGpu(); }, 100);
       }
     },
@@ -234,10 +246,15 @@
     _refreshCheckActions: function () {
       var pythonOk = this._checkState.python;
       var amvergeOk = this._checkState.amverge;
+      var ffmpegOk = this._checkState.ffmpeg;
       var installBtn = document.getElementById('setupInstallBtn');
       var continueBtn = document.getElementById('setupContinueBtn');
-      if (installBtn) installBtn.disabled = !!amvergeOk;
-      if (continueBtn) continueBtn.disabled = !(pythonOk && amvergeOk);
+      
+      // Install button: enabled if amverge OR ffmpeg is missing
+      if (installBtn) installBtn.disabled = !!(amvergeOk && ffmpegOk);
+      
+      // Continue button: requires python, amverge, AND ffmpeg
+      if (continueBtn) continueBtn.disabled = !(pythonOk && amvergeOk && ffmpegOk);
     },
 
     installAmverge: function (cb) {
@@ -251,31 +268,85 @@
         return;
       }
 
-      fill.style.width = '10%';
-      status.textContent = 'Installing amverge package...';
+      var needsFfmpeg = !this._checkState.ffmpeg;
+      var needsAmverge = !this._checkState.amverge;
 
-      window.AmvergeRuntime.install({ extras: ['edge'], gpu: false }, {
-        onStage: function (message) {
-          status.textContent = message;
-        },
-        onLine: function (message) {
-          dbg('debug', 'Setup', message);
-        },
-        onDone: function (ok, detail) {
-          if (!ok) {
-            status.textContent = 'Install failed: ' + detail;
-            dbg('error', 'Setup', detail);
-            return;
-          }
+      var installSteps = [];
+      if (needsAmverge) installSteps.push('amverge');
+      if (needsFfmpeg) installSteps.push('ffmpeg');
+
+      var currentStep = 0;
+      var totalSteps = installSteps.length;
+
+      var runNextStep = function () {
+        if (currentStep >= totalSteps) {
+          // All done
           s._resolvedPython = null;
           fill.style.width = '100%';
-          status.textContent = 'amverge installed successfully';
+          status.textContent = 'Installation complete';
           s._addTimer(function () {
             s._showStep('complete');
             if (cb) cb(true);
           }, 300);
+          return;
         }
-      });
+
+        var step = installSteps[currentStep];
+        var baseProgress = (currentStep / totalSteps) * 100;
+        var stepProgress = 100 / totalSteps;
+
+        if (step === 'amverge') {
+          fill.style.width = baseProgress + '%';
+          status.textContent = 'Installing amverge package...';
+
+          window.AmvergeRuntime.install({ extras: ['edge'], gpu: false }, {
+            onStage: function (message) {
+              status.textContent = message;
+            },
+            onLine: function (message) {
+              dbg('debug', 'Setup', message);
+            },
+            onDone: function (ok, detail) {
+              if (!ok) {
+                status.textContent = 'Install failed: ' + detail;
+                dbg('error', 'Setup', detail);
+                return;
+              }
+              currentStep++;
+              fill.style.width = (baseProgress + stepProgress) + '%';
+              runNextStep();
+            }
+          });
+        } else if (step === 'ffmpeg') {
+          fill.style.width = baseProgress + '%';
+          status.textContent = 'Installing FFmpeg...';
+
+          window.AmvergeRuntime.installFfmpeg({
+            onStage: function (message) {
+              status.textContent = message;
+            },
+            onLine: function (message) {
+              dbg('debug', 'Setup', message);
+            },
+            onDone: function (ok, detail) {
+              if (!ok) {
+                status.textContent = 'FFmpeg install failed: ' + detail;
+                dbg('error', 'Setup', detail);
+                return;
+              }
+              currentStep++;
+              fill.style.width = (baseProgress + stepProgress) + '%';
+              runNextStep();
+            }
+          });
+        } else {
+          currentStep++;
+          runNextStep();
+        }
+      };
+
+      fill.style.width = '5%';
+      runNextStep();
     },
 
     skip: function () {

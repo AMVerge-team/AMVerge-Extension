@@ -327,6 +327,166 @@
       });
     },
 
+    /**
+     * Check if portable FFmpeg is installed.
+     */
+    isFfmpegInstalled: function () {
+      var fs = window.FileSystem;
+      return fs && fs.getPortableFfmpeg && !!fs.getPortableFfmpeg();
+    },
+
+    /**
+     * Install portable FFmpeg using Python's ffmpeg_bootstrap module.
+     * Falls back to direct download if Python isn't available.
+     *
+     * callbacks: { onStage, onLine, onDone(ok, detail) }
+     */
+    installFfmpeg: function (callbacks) {
+      var s = this;
+      var fs = window.FileSystem;
+      var cb = callbacks || {};
+      var line = cb.onLine || function () {};
+      var stage = cb.onStage || function () {};
+      var done = cb.onDone || function () {};
+      this._cancelled = false;
+
+      if (!fs || !fs.childProcess) {
+        done(false, 'Node child_process is unavailable.');
+        return;
+      }
+
+      // If already installed, we're done
+      if (this.isFfmpegInstalled()) {
+        done(true, fs.getPortableFfmpeg());
+        return;
+      }
+
+      var python = this.pythonIn(this.runtimeDir());
+      var hasPython = fs.fileExists(python);
+
+      if (hasPython) {
+        // Use Python's ffmpeg_bootstrap to download
+        stage('Installing portable FFmpeg via Python...');
+        var code = [
+          'from amverge.core.infra.ffmpeg_bootstrap import ensure_ffmpeg',
+          'import sys',
+          'def progress(pct, msg): print(f"PROGRESS|{pct}|{msg}", file=sys.stderr, flush=True)',
+          'result = ensure_ffmpeg(progress)',
+          'print("OK" if result else "FAILED")'
+        ].join('; ');
+
+        this._run(python, ['-c', code], fs.getAppProcessEnv(), function (text) {
+          if (text.indexOf('PROGRESS|') === 0) {
+            var parts = text.split('|');
+            var pct = parseInt(parts[1], 10);
+            var msg = parts.slice(2).join('|');
+            line(msg || ('Downloading... ' + pct + '%'));
+          } else {
+            line(text);
+          }
+        }, function (exitCode, lastLine) {
+          if (s._cancelled) return;
+          if (exitCode === 0 && s.isFfmpegInstalled()) {
+            done(true, fs.getPortableFfmpeg());
+          } else {
+            // Fall back to direct download
+            s._downloadFfmpegDirect(callbacks);
+          }
+        });
+      } else {
+        // No Python yet, do direct download
+        this._downloadFfmpegDirect(callbacks);
+      }
+    },
+
+    /**
+     * Direct FFmpeg download without Python (fallback).
+     */
+    _downloadFfmpegDirect: function (callbacks) {
+      var s = this;
+      var fs = window.FileSystem;
+      var cb = callbacks || {};
+      var line = cb.onLine || function () {};
+      var stage = cb.onStage || function () {};
+      var done = cb.onDone || function () {};
+
+      if (process.platform !== 'win32') {
+        done(false, 'Direct FFmpeg download only supported on Windows. Please install FFmpeg manually.');
+        return;
+      }
+
+      stage('Downloading portable FFmpeg...');
+
+      var ffmpegDir = fs.getPortableFfmpegDir();
+      var zipPath = fs.path.join(ffmpegDir, 'ffmpeg-temp.zip');
+      var url = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-gpl-8.1.zip';
+
+      fs.createFolder(ffmpegDir);
+
+      // Use PowerShell to download
+      var psScript = [
+        '$ProgressPreference = "SilentlyContinue"',
+        'try {',
+        '  Invoke-WebRequest -Uri "' + url + '" -OutFile "' + zipPath.replace(/\\/g, '\\\\') + '" -UseBasicParsing',
+        '  Write-Host "DOWNLOAD_OK"',
+        '} catch {',
+        '  Write-Host "DOWNLOAD_FAILED: $_"',
+        '  exit 1',
+        '}'
+      ].join('\n');
+
+      line('Downloading FFmpeg from GitHub...');
+
+      this._run('powershell.exe', ['-NoProfile', '-Command', psScript], fs.getAppProcessEnv(), line, function (exitCode, lastLine) {
+        if (s._cancelled) return;
+
+        if (exitCode !== 0 || lastLine.indexOf('DOWNLOAD_FAILED') !== -1) {
+          done(false, 'FFmpeg download failed: ' + lastLine);
+          return;
+        }
+
+        // Extract zip
+        stage('Extracting FFmpeg...');
+        line('Extracting archive...');
+
+        var extractScript = [
+          'try {',
+          '  Expand-Archive -Path "' + zipPath.replace(/\\/g, '\\\\') + '" -DestinationPath "' + ffmpegDir.replace(/\\/g, '\\\\') + '" -Force',
+          '  Remove-Item "' + zipPath.replace(/\\/g, '\\\\') + '" -Force',
+          '  # Move bin folder up if nested',
+          '  $nested = Get-ChildItem -Path "' + ffmpegDir.replace(/\\/g, '\\\\') + '" -Directory | Where-Object { Test-Path (Join-Path $_.FullName "bin\\ffmpeg.exe") } | Select-Object -First 1',
+          '  if ($nested) {',
+          '    $src = Join-Path $nested.FullName "bin"',
+          '    $dst = Join-Path "' + ffmpegDir.replace(/\\/g, '\\\\') + '" "bin"',
+          '    if (Test-Path $dst) { Remove-Item $dst -Recurse -Force }',
+          '    Move-Item $src $dst',
+          '    Remove-Item $nested.FullName -Recurse -Force -ErrorAction SilentlyContinue',
+          '  }',
+          '  Write-Host "EXTRACT_OK"',
+          '} catch {',
+          '  Write-Host "EXTRACT_FAILED: $_"',
+          '  exit 1',
+          '}'
+        ].join('\n');
+
+        s._run('powershell.exe', ['-NoProfile', '-Command', extractScript], fs.getAppProcessEnv(), line, function (extCode, extLast) {
+          if (s._cancelled) return;
+
+          if (extCode !== 0 || extLast.indexOf('EXTRACT_FAILED') !== -1) {
+            done(false, 'FFmpeg extraction failed: ' + extLast);
+            return;
+          }
+
+          // Verify installation
+          if (s.isFfmpegInstalled()) {
+            done(true, fs.getPortableFfmpeg());
+          } else {
+            done(false, 'FFmpeg extraction completed but executable not found');
+          }
+        });
+      });
+    },
+
     cancel: function () {
       this._cancelled = true;
       var proc = this._activeProc;

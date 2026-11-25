@@ -262,6 +262,18 @@
       var fs = window.FileSystem;
       if (!fs || !fs.path || !fs.childProcess) return;
 
+      // Check portable FFmpeg first (installed by AMVerge setup)
+      if (fs.getPortableFfmpeg && fs.getPortableFfprobe) {
+        var portableFfmpeg = fs.getPortableFfmpeg();
+        var portableFfprobe = fs.getPortableFfprobe();
+        if (portableFfmpeg && portableFfprobe) {
+          this._ffmpeg = portableFfmpeg;
+          this._ffprobe = portableFfprobe;
+          dbg('info', 'Proxy', 'Using portable ffprobe/ffmpeg (fast path)');
+          return;
+        }
+      }
+
       var ext = process.platform === 'win32' ? '.exe' : '';
       var dirs = [];
       var local = process.env.LOCALAPPDATA || '';
